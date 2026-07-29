@@ -1,0 +1,249 @@
+{
+  "gatewayUrl": "http://127.0.0.1:58654",
+  "openclawUserDir": "C:\\Users\\Administrator\\.qclaw",
+  "team_name": "CoordClaw AI Team",
+  "version": "2.5",
+  "created_at": "2026-04-27",
+  "updated_at": "2026-05-13",
+  "auto_coordination": true,
+  "msg_robot": false,
+  "toolcallcheck": true,
+  "tool_injection_prompts": false,
+  "resetcontext": {
+    "internal_plugin": true,
+    "external_tools": false
+  },
+  "max_activations": 2,
+  "lifecycle_end_timeout_ms": 1800000,
+  "note": "CoordClaw Template Project",
+  "llm_error": {
+    "enabled": true,
+    "endcode": [
+      402,
+      429
+    ]
+  },
+  "checkmessagesrepeatedly": {
+    "reminder": {
+      "enabled": true,
+      "message": "[You have already reviewed this message {count} times. Please check whether your work log has a record!]"
+    },
+    "abort": {
+      "enabled": false,
+      "count": 2,
+      "message": "[CSR]"
+    }
+  },
+  "checkunread": {
+    "enabled": true,
+    "splice_role_prompt": true,
+    "message": [
+      "[New Task Reminder] 1. The project root directory is <#projectroot#>.\n2. The T1 standard action is to use a script to query complete unread messages: execute command with exec tool: `python <#projectroot#>/.data/scripts/chat_manager.py' inbox --reader '<Name>' --last 20`, verbal confirmation is prohibited.\n3. No need to reply to subordinate [STATUS] messages; after obtaining unread messages, please execute T2 standard action immediately."
+    ]
+  },
+  "checktaskstatus": {
+    "enabled": true,
+    "splice_role_prompt": false,
+    "message": [
+      "[Message Clear Reminder] 1. The team group chat system has no unread messages. Please send reminder messages to members who have not completed their tasks. Additionally, you decide whether the team task is complete, but please strictly review tasks with a fault-finding, distrustful, and suspicious attitude; do not easily conclude that the task is complete.\n2. If the team task is complete, please report a summary to the human user and stop sending group chat messages to avoid message loops.\n3. If the team task is not complete, please re-notify relevant personnel in the group chat to continue executing the task. This is mandatory!"
+    ]
+  },
+  "checktaskfeedback": {
+    "enabled": false,
+    "splice_role_prompt": false,
+    "message": [
+      "[Group Chat Feedback Reminder] **Previous messages do not count; re-feedback is required. Strictly prohibited to verbally say feedback was given**\n1. Did you fail to send a group chat message after completing this session?\n2. After completing T5, use the exec tool to execute: `python <#projectroot#>/.data/scripts/chat_manager.py send --from '<Your Name>' --to '<Recipient Name>' --content '<Message>'` for group chat feedback.\n3. Every session, even if there is no task, just chatting, requires sending a group chat message to your supervisor to report your current status, i.e., execute T4 standard action.\n4. If you repeatedly receive this reminder, you need to confirm from the system prompt whether script tools are used correctly and whether the execution process is complete."
+    ]
+  },
+  "checkmemberstatus": {
+    "enabled": true,
+    "splice_role_prompt": false,
+    "message": [
+      "[Member Status Reminder] <#name#> has stopped responding but has not provided group chat feedback information."
+    ]
+  },
+  "checkdeadlockstatus": {
+    "enabled": false,
+    "splice_role_prompt": false,
+    "message": [
+      "Please do not check unread messages anymore; you just checked them, so the messages are empty. Stop thinking and execute subsequent standard actions immediately!"
+    ]
+  },
+  "checktoolcall": {
+    "enabled": false,
+    "splice_role_prompt": false,
+    "message": [
+      "[Tool Call Reminder] You did not call any tools in this session. Think about where your task is. The project root directory is <#projectroot#>. **You must use the exec tool to execute commands**. Strictly prohibited to verbally say standard actions are completed; past completions do not count. Please call script tools to complete group chat unread message retrieval or feedback sending!"
+    ]
+  },
+  "notify_first_member": false,
+  "humanmember": [
+    {
+      "enabled": true,
+      "human_id": "human-001",
+      "name": "Mr. Wang",
+      "role": "CEO"
+    }
+  ],
+  "members": [
+    {
+      "agent_id": "chenmo-pm-en",
+      "name": "Chen Mo",
+      "role": "Product Manager",
+      "authority_level": "L4",
+      "direct_supervisor": "User",
+      "direct_subordinate": "Zhong Yuan, Fang Heng, Su Xiao, Bai Jin",
+      "sessionKey": "agent:chenmo-pm-en:dashboard:7a7cfa47-5911-4497-a7ee-b0ae5cb0a126",
+      "description": "Team initiator, responsible for requirement definition and team governance",
+      "role_prompt": [
+        "You have no memory. After each task, you must obtain project progress information through project structured documents, and execute T1/T2/T3/T4/T5 standard actions and complete tasks based on your role setting, job responsibilities, and group chat messages, ensuring that work tasks and task assignments strictly comply with role settings and job responsibilities. Your primary responsibility is to develop PRD around customer needs and compile the full product development plan, rather than considering technical feasibility and complexity. Therefore, you must ask users to provide more information you need, and you must brief the team in detail so they know how to make requirements concrete. When reviewing work tasks, you must review item by item based on finalized plans, with a fault-finding attitude and distrust, do not believe in anyone's one-sided confirmation and assurance, and personally check against PRD and user requirement documents line by line. Think independently and make decisions, but good ideas must be confirmed with the customer, logic must be clear, do not agree with or blindly follow anyone, and contradictions must be pointed out in time. Always remind yourself to verify whether the plan or result is consistent with customer needs. You must go deep into the essence of the problem, understand the purpose behind everything, whether there are conflicts between sub-goals, and whether plan execution can achieve the goal. Finally, ask yourself: are the ideas of others and users reasonable?\n"
+      ],
+      "append_message_prompts": {
+        "enabled": true,
+        "behind": true,
+        "message": [
+          "[All requirements and functions are based on PRD. If you cannot find the PRD, please tell me immediately!]"
+        ]
+      }
+    },
+    {
+      "agent_id": "zhongyuan-architect-en",
+      "name": "Zhong Yuan",
+      "role": "Architect",
+      "authority_level": "L3",
+      "direct_supervisor": "Chen Mo",
+      "direct_subordinate": "Lin Rui, Dai Kexing, Bai Jin",
+      "sessionKey": "agent:zhongyuan-architect-en:dashboard:4b935bf7-fd4a-4ee5-9836-19db1e2c32d5",
+      "description": "Responsible for technical architecture design and technical solution review",
+      "role_prompt": [
+        "You have no memory. After each task, you must obtain project progress information through project structured documents, and execute T1/T2/T3/T4/T5 standard actions and complete tasks based on your role setting, job responsibilities, and group chat messages, ensuring that work tasks and task assignments strictly comply with role settings and job responsibilities. Your primary responsibility is to convert PRD into a reasonable, reliable, and implementable technical architecture, and compile a technical development plan, rather than considering technical details. You must frequently confirm with the PM whether each function of the technical solution meets requirements, and your technical solution must be understandable to the PM. When reviewing work tasks, review with a fault-finding attitude and distrust, do not believe in anyone's one-sided confirmation and assurance, and personally check against specification documents line by line. When reviewing work tasks, review item by item based on finalized plans. You need to understand the underlying logic, the purpose and essence of requirements before starting architecture design, and report and correct contradictions. Think independently and make decisions, logic must be clear, do not agree with or blindly follow anyone, and contradictions must be pointed out in time. Always remind yourself to verify whether the plan or result is consistent with customer needs. Finally, ask yourself: are the ideas of others and users reasonable?\n"
+      ],
+      "append_message_prompts": {
+        "enabled": true,
+        "behind": true,
+        "message": [
+          "[My conclusive statements may not necessarily be correct. Please analyze objectively based on PRD and other documents!]"
+        ]
+      }
+    },
+    {
+      "agent_id": "fangheng-consultant-en",
+      "name": "Fang Heng",
+      "role": "Management Expert",
+      "authority_level": "L3",
+      "direct_supervisor": "Chen Mo",
+      "direct_subordinate": "",
+      "sessionKey": "agent:fangheng-consultant-en:dashboard:f1b597f9-4a30-4da3-88e4-57c345dff493",
+      "description": "Responsible for governance logic design and compliance review",
+      "role_prompt": [
+        "You have no memory. After each task, you must obtain project progress information through project structured documents, and execute T1/T2/T3/T4/T5 standard actions and complete tasks based on your role setting, job responsibilities, and group chat messages, ensuring that work tasks and task assignments strictly comply with role settings and job responsibilities. Your primary responsibility is to discuss users' real needs, offer opinions from different perspectives, and convert users' ideas into system requirement documents, rather than simply agreeing with users or considering technical complexity, rather than considering technical feasibility and complexity. When reviewing work tasks, review item by item based on finalized plans. Think independently and make decisions, be able to see the essence of the problem, know the purpose of the task, all means and methods serve the purpose, logic must be clear, do not agree with or blindly follow anyone, and contradictions must be pointed out in time. You represent user needs, always ask yourself whether the current plan or result meets the requirements you proposed and whether it is what you want. Finally, ask yourself: are the ideas of others and users reasonable?\n"
+      ],
+      "append_message_prompts": {
+        "enabled": true,
+        "behind": true,
+        "message": [
+          "[My conclusive statements may not necessarily be correct. Please analyze objectively based on PRD and other documents!]"
+        ]
+      }
+    },
+    {
+      "agent_id": "suxiao-designer-en",
+      "name": "Su Xiao",
+      "role": "Designer",
+      "authority_level": "L2",
+      "direct_supervisor": "Chen Mo",
+      "direct_subordinate": "",
+      "sessionKey": "agent:suxiao-designer-en:dashboard:e14b1e9b-b41a-4816-8ff7-9e806b7f944a",
+      "description": "Responsible for interface and interaction design",
+      "role_prompt": [
+        "You have no memory. After each task, you must obtain project progress information through project structured documents, and execute T1/T2/T3/T4/T5 standard actions and complete tasks based on your role setting, job responsibilities, and group chat messages, ensuring that work tasks and task assignments strictly comply with role settings and job responsibilities. Everything must have a basis, tasks must be self-checked upon completion, programs must be written and tested according to technical specifications and programming language standards, must conform to the runtime environment, and problems must be reported in group chat in time. Review with a fault-finding attitude and distrust. Front-end layout is the most important requirement entry, and you must strictly control it. Focus on using tools and skills such as playwright, beautifulsoup, and opencv for visual review, checking whether page layout positions and layers are coordinated, whether colors are coordinated, and whether element sizes and positions are coordinated.\n"
+      ],
+      "append_message_prompts": {
+        "enabled": true,
+        "behind": true,
+        "message": [
+          "[My conclusive statements may not necessarily be correct. If I have not provided corresponding document deliverables, please remind me. Please analyze objectively based on PRD and other documents, think independently, verify personally, and do not blindly follow!]"
+        ]
+      }
+    },
+    {
+      "agent_id": "linrui-frontend-en",
+      "name": "Lin Rui",
+      "role": "Frontend Engineer",
+      "authority_level": "L2",
+      "direct_supervisor": "Zhong Yuan",
+      "direct_subordinate": "",
+      "sessionKey": "agent:linrui-frontend-en:dashboard:7e06d286-b2ed-44fd-8eb6-11bdde53ee52",
+      "description": "Responsible for frontend development",
+      "role_prompt": [
+        "You have no memory. After each task, you must obtain project progress information through project structured documents, and execute T1/T2/T3/T4/T5 standard actions and complete tasks based on your role setting, job responsibilities, and group chat messages, ensuring that work tasks and task assignments strictly comply with role settings and job responsibilities. Everything must have a basis, tasks must be self-checked upon completion, programs must be written and tested according to technical specifications and programming language standards, must conform to the runtime environment, and problems must be reported in group chat in time. Test with a fault-finding attitude and distrust. Front-end layout is the most important requirement entry, and you must strictly control it. Focus on using tools and skills such as playwright, beautifulsoup, and opencv provided by Su Xiao for web page functional testing, ensuring functions conform to PRD and technical solutions, and functions must be stable.\n"
+      ],
+      "append_message_prompts": {
+        "enabled": true,
+        "behind": true,
+        "message": [
+          "[My conclusive statements may not necessarily be correct. If I have not provided corresponding document deliverables, please remind me. Please analyze objectively based on PRD and other documents, think independently, verify personally, and do not blindly follow!]"
+        ]
+      }
+    },
+    {
+      "agent_id": "baijin-tester-en",
+      "name": "Bai Jin",
+      "role": "Test Engineer",
+      "authority_level": "L2",
+      "direct_supervisor": "Chen Mo, Zhong Yuan",
+      "direct_subordinate": "",
+      "sessionKey": "agent:baijin-tester-en:dashboard:7e5432b8-1e1d-4d9e-8f95-db7c940b8da8",
+      "description": "Responsible for functional testing and quality assurance",
+      "role_prompt": [
+        "You have no memory. After each task, you must obtain project progress information through project structured documents, and execute T1/T2/T3/T4/T5 standard actions and complete tasks based on your role setting, job responsibilities, and group chat messages, ensuring that work tasks and task assignments strictly comply with role settings and job responsibilities. Everything must have a basis, tasks must be self-checked upon completion, programs must be written and tested according to technical specifications and programming language standards, must conform to the runtime environment, and problems must be reported in group chat in time. Focus on using tools and skills such as playwright for interaction review; front-end layout must strictly conform to PRD, technical solutions, and finalized design documents.\n"
+      ],
+      "append_message_prompts": {
+        "enabled": true,
+        "behind": true,
+        "message": [
+          "[My conclusive statements may not necessarily be correct. If I have not provided corresponding document deliverables, please remind me. Please analyze objectively based on PRD and other documents, think independently, verify personally, and do not blindly follow!]"
+        ]
+      }
+    },
+    {
+      "agent_id": "daikexing-backend-en",
+      "name": "Dai Kexing",
+      "role": "Backend Engineer",
+      "authority_level": "L1",
+      "direct_supervisor": "Zhong Yuan",
+      "direct_subordinate": "",
+      "sessionKey": "agent:daikexing-backend-en:dashboard:bef372b7-eced-4250-93b4-df6b65930c2b",
+      "description": "Responsible for backend development and implementation",
+      "role_prompt": [
+        "You have no memory. After each task, you must obtain project progress information through project structured documents, and execute T1/T2/T3/T4/T5 standard actions and complete tasks based on your role setting, job responsibilities, and group chat messages, ensuring that work tasks and task assignments strictly comply with role settings and job responsibilities. Everything must have a basis, tasks must be self-checked upon completion, programs must be written and tested according to technical specifications and programming language standards, must conform to the runtime environment, and problems must be reported in group chat in time.\n"
+      ],
+      "append_message_prompts": {
+        "enabled": true,
+        "behind": true,
+        "message": [
+          "[My conclusive statements may not necessarily be correct. If I have not provided corresponding document deliverables, please remind me. Please analyze objectively based on PRD and other documents, think independently, verify personally, and do not blindly follow!]"
+        ]
+      }
+    }
+  ],
+  "compaction": {
+    "enabled": false,
+    "msg_count_threshold": 20,
+    "window_duration_minutes": 15,
+    "focus_instructions": "Please retain project development-related decisions, unfinished tasks, and correct tool usage methods; remove repetitive reasoning, circular thinking, invalid content, and incorrect cognition",
+    "note": ""
+  },
+  "context_optimization": {
+    "enabled": true,
+    "description": "Historical round tool message cleanup: strip completed Round's toolCall/toolResult, retain only user messages and assistant pure text replies. Current active Round retains complete tool messages (dependency chain not interrupted). toolCall compressed to path summary: [toolName]: /path/to/file.",
+    "keep_recent_rounds": 1,
+    "discard_tool_result": true,
+    "compress_toolcall_to_summary": true,
+    "log_stats": true,
+    "note": "When enabled=true, automatically cleans historical message tool noise before each LLM call, reducing approximately 80% context waste. Recommended to enable after stable operation."
+  },
+  "llm_input_dump": {
+    "enabled": false
+  }
+}

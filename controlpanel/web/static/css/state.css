@@ -1,0 +1,286 @@
+/* ============================================================
+   State — CoordClaw Control Panel
+   
+   瞬态视觉状态：未读/已读、连接状态、加载动画、空状态等。
+   来源：style.css 拆分
+   ============================================================ */
+
+/* ═══════════════════════════════
+   Message Card States
+   ═══════════════════════════════ */
+
+/* D5 未读消息视觉特征（只有未读消息才有特殊背景） */
+.msg-card.unread {
+  background: var(--bg-unread);
+  border: 1px solid var(--border-unread);
+  border-left: 4px solid var(--indicator-unread);
+}
+
+.msg-card.unread .sender,
+.msg-card.unread .message-content {
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.msg-card.unread .timestamp {
+  color: var(--indicator-unread);
+  font-weight: 500;
+}
+
+.msg-card.unread:hover {
+  background: color-mix(in srgb, var(--bg-unread) 70%, transparent);
+  border-color: var(--indicator-unread);
+}
+
+/* D5 已读消息（使用默认基础样式） */
+.msg-card.read {
+  /* 继承 .msg-card 的所有基础样式 */
+}
+
+.msg-card.read .sender,
+.msg-card.read .message-content {
+  font-weight: normal;
+}
+
+.msg-card.read .timestamp {
+  color: var(--text-secondary);
+}
+
+/* ═══════════════════════════════
+   Unread Badge State
+   ═══════════════════════════════ */
+.unread-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: 10px;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1;
+  background: var(--accent-red, #ef4444);
+  color: #ffffff;
+  flex-shrink: 0;
+  transition: all 0.2s ease;
+  box-shadow: 0 2px 4px rgba(239, 68, 68, 0.3);
+}
+
+.unread-badge:not(.zero):not(.empty) {
+  animation: badge-pulse 2s infinite;
+}
+
+@keyframes badge-pulse {
+  0%, 100% {
+    transform: scale(1);
+    box-shadow: 0 2px 4px rgba(239, 68, 68, 0.3);
+  }
+  50% {
+    transform: scale(1.05);
+    box-shadow: 0 2px 8px rgba(239, 68, 68, 0.5);
+  }
+}
+
+.unread-badge.zero,
+.unread-badge.empty {
+  background: var(--border-color, #404040);
+  color: var(--text-secondary, #9ca3af);
+  box-shadow: none;
+  animation: none;
+}
+
+/* ═══════════════════════════════
+   Connection States
+   ═══════════════════════════════ */
+.status-connected { color: var(--accent-green); }
+.status-reconnecting { color: var(--accent-yellow); }
+.status-disconnected { color: var(--accent-red); }
+
+/* ═══════════════════════════════
+   Connection Status Indicators
+   ==============================
+   Status dots in header use .status-dot elements with
+   .status-connected / .status-disconnected / .status-reconnecting
+   ═══════════════════════════════ */
+
+/* ═══════════════════════════════
+   Card List Dot States
+   ═══════════════════════════════ */
+.card-list-dot.active {
+  background: var(--accent-green);
+  box-shadow: 0 0 5px color-mix(in srgb, var(--accent-green) 40%, transparent);
+}
+
+.card-list-dot.inactive {
+  background: var(--text-secondary);
+  opacity: 0.35;
+}
+
+/* ═══════════════════════════════
+   Read Tag State
+   ═══════════════════════════════ */
+.read-tag {
+  flex-shrink: 0;
+  width: 22px;
+  height: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  cursor: pointer;
+  border-radius: 50%;
+  user-select: none;
+  transition: all 0.15s ease;
+  margin-left: 8px;
+  margin-top: 2px;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  color: var(--accent-green);
+}
+
+.read-tag:hover {
+  background: var(--accent-blue);
+  color: #fff;
+  border-color: var(--accent-blue);
+  box-shadow: 0 2px 6px rgba(59, 130, 246, 0.3);
+}
+
+.read-tag.unread-btn {
+  color: var(--indicator-unread);
+  border-color: var(--border-unread);
+}
+
+/* ═══════════════════════════════
+   Empty State
+   ═══════════════════════════════ */
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 60px 20px;
+  color: var(--text-secondary);
+}
+.empty-state .empty-icon {
+  font-size: 48px;
+  margin-bottom: 12px;
+  opacity: 0.6;
+}
+.empty-state .empty-text {
+  font-size: 16px;
+  opacity: 0.7;
+}
+
+/* ═══════════════════════════════
+   Date Separator
+   ═══════════════════════════════ */
+.date-separator {
+  text-align: center;
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin: 16px 0 8px;
+  padding: 4px 8px;
+  background: var(--bg-primary);
+  border-radius: 12px;
+  display: inline-block;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+/* ═══════════════════════════════
+   Loading & Progress State
+   ═══════════════════════════════ */
+#load-status {
+  color: var(--accent-blue, #3b82f6);
+  font-weight: 500;
+}
+
+.project-switch-loading {
+  padding: 40px;
+  text-align: center;
+  color: var(--text-secondary);
+  font-size: 14px;
+}
+
+/* ═══════════════════════════════
+   SSE Mode State
+   ═══════════════════════════════ */
+#sse-mode {
+  color: var(--text-secondary);
+  font-size: 11px;
+}
+
+/* ═══════════════════════════════
+   Theme State Overrides
+   ═══════════════════════════════ */
+:root:not(.light-theme) .rail-tab {
+  opacity: 0.8;
+  text-shadow: 0 0 6px rgba(255, 255, 255, 0.25);
+}
+
+:root:not(.light-theme) .rail-tab.active {
+  text-shadow: 0 0 8px rgba(255, 255, 255, 0.4);
+}
+
+:root:not(.light-theme) .rail-collapse {
+  color: var(--text-secondary);
+  text-shadow: none;
+}
+
+/* ═══════════════════════════════
+   STL New Messages State
+   ═══════════════════════════════ */
+.stl-wrapper.has-new-messages .stl-btn {
+  background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+  animation: stl-pulse-red 2s infinite;
+}
+
+@keyframes stl-pulse-red {
+  0%, 100% {
+    box-shadow:
+      0 4px 12px rgba(239, 68, 68, 0.4),
+      0 0 0 0 rgba(239, 68, 68, 0.15);
+  }
+  50% {
+    box-shadow:
+      0 4px 16px rgba(239, 68, 68, 0.6),
+      0 0 0 6px rgba(239, 68, 68, 0.08);
+  }
+}
+
+/* ═══════════════════════════════
+   Sidebar Member Hover State
+   ═══════════════════════════════ */
+#sidebar [data-member] {
+  transition: background 0.2s ease, border-color 0.2s ease;
+}
+
+
+/* ═══════════════════════════════
+   Send Button Disabled State
+   ═══════════════════════════════ */
+@keyframes btn-sending {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.12); }
+}
+
+/* ═══════════════════════════════
+   Member Icon Busy State
+   ═══════════════════════════════ */
+@keyframes msg-breathe {
+  0%, 100% { transform: scale(1); }
+  50%      { transform: scale(1.2); }
+}
+
+/* ═══════════════════════════════
+   Path Scroll Animation State
+   ═══════════════════════════════ */
+@keyframes path-scroll {
+  0%, 15% { transform: translateX(0); }
+  85%, 100% { transform: translateX(calc(-100% + 130px)); }
+}
+
+#project-info .info-path:hover .info-path-inner {
+  animation: path-scroll 6s linear infinite;
+}

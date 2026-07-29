@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <title data-i18n="page_title">CoordClaw - 控制中心</title>
+    <link rel="icon" type="image/png" href="png/logo-main.png">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script defer src="js/vendor/alpine.min.js?v=1"></script>
+    <link rel="stylesheet" href="css/tokens.css?v=4">
+    <link rel="stylesheet" href="css/components.css?v=10">
+    <link rel="stylesheet" href="css/layout.css?v=4">
+    <link rel="stylesheet" href="css/state.css?v=4">
+    <link rel="stylesheet" href="css/style.css?v=4">
+</head>
+<body>
+    <div id="app" class="flex flex-col h-screen"
+         x-data="appState()"
+         x-init="window.__alpineApp = $data">
+        <!-- 内容区 -->
+        <div class="flex flex-1 min-h-0">
+        <!-- 侧边栏 -->
+        <aside id="sidebar" class="sidebar" :class="{ collapsed: sidebarCollapsed }">
+            <!-- 图标导航条 -->
+            <div class="sidebar-rail">
+                <button class="rail-tab" :class="{ active: sidebarTab === 'project' }" @click="switchTab('project')" data-tab="project" data-i18n-title="sidebar_tab_project" title="当前项目">🖥️</button>
+                <button class="rail-tab" :class="{ active: sidebarTab === 'team' }" @click="switchTab('team')" data-tab="team" data-i18n-title="sidebar_tab_team" title="团队">👥</button>
+                <button class="rail-tab" :class="{ active: sidebarTab === 'ops' }" @click="switchTab('ops')" data-tab="ops" data-i18n-title="sidebar_tab_ops" title="项目列表">📁</button>
+                <button class="rail-tab" :class="{ active: sidebarTab === 'tools' }" @click="switchTab('tools')" data-tab="tools" data-i18n-title="sidebar_tab_tools" title="工具">🔧</button>
+                <div class="rail-spacer"></div>
+                <button class="rail-tab rail-collapse" @click="toggleCollapse()" data-i18n-title="sidebar_collapse" title="收起侧边栏">◀</button>
+            </div>
+            <!-- 卡片内容区 -->
+            <div class="sidebar-content" id="sidebar-content">
+                <!-- 项目卡片（默认） -->
+                <span id="update-badge" style="display:none"></span>
+                <div class="sidebar-card" :class="{ active: sidebarTab === 'project' }" data-tab="project">
+                    <!-- 上部：项目信息 -->
+                    <div id="team-info" class="p-3 border-b border-[var(--border-color)]">
+        <div class="flex items-center justify-between">
+            <div class="flex items-center gap-2" style="flex:1;justify-content:center">
+                <h2 class="font-bold text-base" data-i18n="sidebar_project_info">当前项目</h2>
+                <button id="btn-switch-project" class="switch-project-btn" data-i18n-title="proj_switch_title" title="切换项目">⇄</button>
+            </div>
+        </div>
+                    </div>
+                    <div id="project-info" class="bg-[var(--bg-card)] text-xs text-[var(--text-secondary)] space-y-1.5 p-3">
+                        <div class="info-row">
+                            <span class="info-label" data-i18n="proj_team_name">团队名称</span>
+                            <span class="info-value" x-text="teamName || i18n('proj_unnamed')"></span>
+                        </div>
+                        <div class="info-row">
+                            <span class="info-label" data-i18n="proj_name">项目名称</span>
+                            <span class="info-value" x-text="projectName || i18n('proj_unnamed')"></span>
+                        </div>
+                        <div class="info-row">
+                            <span class="info-label" data-i18n="proj_member_count">成员数量</span>
+                            <span class="info-value" style="display:flex;align-items:center;gap:6px">
+                                <span x-text="memberCount"></span>
+                                <span class="org-chart-icon" data-action="open-org-chart" data-i18n-title="org_chart_title" title="组织架构图">
+                                    <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><rect x="1" y="1" width="6" height="4" rx="1" stroke="currentColor"/><rect x="9" y="5" width="6" height="4" rx="1" stroke="currentColor"/><rect x="9" y="11" width="6" height="4" rx="1" stroke="currentColor"/><line x1="4" y1="5" x2="4" y2="8" stroke="currentColor"/><line x1="4" y1="8" x2="9" y2="8" stroke="currentColor"/><line x1="4" y1="8" x2="4" y2="13" stroke="currentColor"/><line x1="4" y1="13" x2="9" y2="13" stroke="currentColor"/></svg>
+                                </span>
+                            </span>
+                        </div>
+                        <div class="info-row">
+                            <span class="info-label" data-i18n="proj_token_usage">词元用量</span>
+                            <span class="info-value" x-text="formatTokens(tokenUsage)"></span>
+                            <span class="org-chart-icon" data-action="open-token-stats" data-i18n-title="token_chart_title" title="项目词元量统计">📊</span>
+                        </div>
+                        <div class="info-row">
+                            <span class="info-label" data-i18n="proj_auto_coord">自动协调</span>
+                            <button class="toggle-switch" :class="{ active: autoCoordination }" @click="window.handleToggleAutoCoord()" data-i18n-title="proj_toggle_auto_title" title="开启/关闭自动协调">
+                                <span class="toggle-knob"></span>
+                            </button>
+                        </div>
+                        <div class="info-row">
+                            <span class="info-label" data-i18n="proj_msg_robot">消息机器人</span>
+                            <button class="toggle-switch" :class="{ active: msgRobot }" @click="window.handleToggleMsgRobot()" data-i18n-title="proj_toggle_robot_title" title="开启/关闭消息机器人">
+                                <span class="toggle-knob"></span>
+                            </button>
+                        </div>
+                        <div class="info-row">
+                            <span class="info-label" data-i18n="proj_project_dir">项目目录</span>
+                            <span class="info-path info-path-clickable" data-action="open-project-dir" data-i18n-title="proj_open_dir_title" title="打开项目目录">
+                                <span class="info-path-inner" x-text="projectRoot"></span>
+                            </span>
+                        </div>
+                    </div>
+                    <!-- 下部：成员列表 -->
+                    <div class="flex-1 flex flex-col min-h-0 rounded-t-lg bg-[var(--bg-card)] overflow-hidden">
+                        <div id="member-header" style="background:color-mix(in srgb, var(--accent-blue) 10%, var(--bg-secondary))" class="p-3 text-sm font-medium text-center border-b border-[var(--border-color)]" data-i18n="sidebar_member_list">
+                            成员列表
+                        </div>
+                        <div id="member-list" class="flex-1 card-list overflow-y-auto" role="list" data-i18n-aria="aria_member_list" aria-label="成员列表">
+                            <template x-for="m in memberList" :key="m.name">
+                                <div class="list-item-card flex items-center gap-3 cursor-pointer"
+                                     :class="{ 'member-selected': m.selected, 'human-card': !m.isAgent }"
+                                     :data-member="m.name" :data-agent-id="m.agentId" :data-session-key="m.sessionKey"
+                                     role="listitem" :aria-label="m.ariaLabel" tabindex="0">
+                                    <div class="w-8 h-8 rounded-full flex items-center justify-center text-white text-sm font-bold flex-shrink-0" :style="'background:' + m.avatarBg" x-text="m.avatarChar"></div>
+                                    <div class="flex-1 min-w-0">
+                                        <div class="font-medium text-sm truncate flex items-center gap-2" style="color: var(--text-primary);">
+                                            <span x-text="m.name"></span>
+                                            <span x-show="m.isAgent" class="member-msg-icon" :class="{ 'is-ready': m.status === 'ready', 'is-running': m.status === 'running' }" :data-member="m.name" :data-agent-id="m.agentId" :title="m.msgTitle">
+                                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                                            </span>
+                                            <span x-show="m.isAgent" class="member-skill-icon" :data-member="m.name" :data-agent-id="m.agentId" :title="m.skillTitle">
+                                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>
+                                            </span>
+                                            <span x-show="m.showUnreadTag" class="ml-2 text-xs text-[var(--accent-blue)] font-medium" data-i18n="member_unread_tag">未读</span>
+                                        </div>
+                                        <div class="text-xs" style="color: var(--text-secondary);" x-text="m.role"></div>
+                                    </div>
+                                    <span class="unread-badge" :class="m.unreadClass" x-text="m.unread"></span>
+                                </div>
+                            </template>
+                        </div>
+                    </div>
+                </div>
+                <!-- 团队卡片 -->
+                <div class="sidebar-card" :class="{ active: sidebarTab === 'team' }" data-tab="team">
+                    <div class="card-title" style="display:flex;align-items:center;justify-content:center;position:relative;">
+                        <span data-i18n="sidebar_team_title">团队管理</span>
+                        <button id="btn-import-team" class="card-title-action" data-action="import-team" title="导入团队包" data-i18n-title="title_import_team" style="position:absolute;right:8px;top:50%;transform:translateY(-50%);background:none;border:1px solid var(--border-color);border-radius:4px;cursor:pointer;padding:2px 5px;line-height:1;color:var(--text-secondary)"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" x2="3" y1="12" y2="12"/></svg></button>
+                    </div>
+                    <div id="team-list" class="card-list">
+                        <div class="card-list-new-row" data-action="new-team">
+                            <span>➕</span>
+                            <span data-i18n="btn_new_team">新建团队</span>
+                        </div>
+                        <template x-if="teamList.length === 0">
+                            <div class="card-list-item" style="color:var(--text-secondary)" data-i18n="list_no_teams">暂无团队</div>
+                        </template>
+                        <template x-for="t in teamList" :key="t.id">
+                            <div class="list-item-card" :data-team-id="t.id" :data-team-name="t.name" :data-team-template="t.template">
+                                <div class="card-list-item">
+                                    <button class="proj-action-icon" data-action="team-rename" data-i18n-title="title_rename_team" title="重命名团队" x-show="editingTeamId !== t.id">✏️</button>
+                                    <span class="card-list-name" x-show="editingTeamId !== t.id" x-text="t.name"></span>
+                                    <template x-if="editingTeamId === t.id">
+                                        <input class="team-rename-input flex-1 min-w-0 bg-[var(--bg-primary)] text-[var(--text-primary)] border border-[var(--border-color)] rounded px-2 py-1 text-sm" x-model="editingTeamValue" x-init="$el.focus(); $el.select()" @keydown.enter.prevent="commitTeamRename(t.id)" @keydown.escape.prevent="cancelTeamRename()" @blur="commitTeamRename(t.id)" />
+                                    </template>
+                                    <span class="card-list-badge" x-text="t.projCount + ' 个项目'"></span>
+                                </div>
+                                <div class="proj-inline-actions">
+                                    <button class="proj-action-icon" data-action="team-open-dir" data-i18n-title="title_open_team_dir" title="打开团队目录">📂</button>
+                                    <button class="proj-action-icon" data-action="team-edit-members" data-i18n-title="title_edit_members" title="编辑成员">⚙</button>
+                                    <button class="proj-action-icon" data-action="team-edit-rules" data-i18n-title="title_edit_team_rules" title="编辑规则">📜</button>
+                                    <button class="proj-action-icon" data-action="export-team" data-i18n-title="title_export_team" title="导出团队包"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" x2="9" y1="12" y2="12"/></svg></button>
+                                    <button class="proj-action-icon danger" data-action="team-delete" data-i18n-title="title_delete_team" title="删除团队">🗑</button>
+                                </div>
+                            </div>
+                        </template>
+                    </div>
+                </div>
+                <!-- 项目操作卡片 -->
+                <div class="sidebar-card" :class="{ active: sidebarTab === 'ops' }" data-tab="ops">
+                    <div class="card-title" data-i18n="sidebar_ops_title">项目列表</div>
+                    <div id="project-card-list" class="card-list">
+                        <div class="card-list-new-row" data-action="new-project">
+                            <span>➕</span>
+                            <span data-i18n="btn_new_project">新建项目</span>
+                        </div>
+                        <template x-if="projectCardList.length === 0">
+                            <div class="card-list-item" style="color:var(--text-secondary)" data-i18n="list_no_projects">暂无项目</div>
+                        </template>
+                        <template x-for="(t, tIdx) in projectCardList" :key="t.id">
+                            <div>
+                                <div class="card-list-group" :data-team-toggle="tIdx">
+                                    <span class="team-toggle-icon">▼</span>
+                                    <span x-text="t.name"></span>
+                                </div>
+                                <div class="card-team-projects" :data-team="tIdx">
+                                    <template x-if="t.projects.length === 0">
+                                        <div class="card-list-item" style="color:var(--text-secondary);padding-left:24px" data-i18n="list_no_items">暂无</div>
+                                    </template>
+                                    <template x-for="p in t.projects" :key="p.id">
+                                        <div class="list-item-card" :data-proj-id="p.id" :data-proj-name="p.name" :data-proj-root="p.root" :data-team-id="t.id">
+                                            <div class="card-list-item" :data-switch-project="p.id" :data-switch-name="p.name">
+                                                <button class="proj-action-icon" data-action="project-rename" data-i18n-title="title_rename_project" title="重命名项目" x-show="editingProjectId !== p.id">✏️</button>
+                                                <span class="card-list-name" x-show="editingProjectId !== p.id" x-text="p.name"></span>
+                                                <template x-if="editingProjectId === p.id">
+                                                    <input class="team-rename-input flex-1 min-w-0 bg-[var(--bg-primary)] text-[var(--text-primary)] border border-[var(--border-color)] rounded px-2 py-1 text-sm" x-model="editingProjectValue" x-init="$el.focus(); $el.select()" @keydown.enter.prevent="commitProjectRename(t.id, p.id)" @keydown.escape.prevent="cancelProjectRename()" @blur="commitProjectRename(t.id, p.id)" />
+                                                </template>
+                                                <button class="mini-switch-btn" :class="{ 'active': p.isActive }" data-i18n-title="title_switch_project" title="切换项目">⇄</button>
+                                            </div>
+                                            <div class="proj-inline-actions">
+                                                <button class="proj-action-icon" data-action="open-dir" data-i18n-title="title_open_dir" title="打开目录">📂</button>
+                                                <button class="proj-action-icon" data-action="edit-rules" data-i18n-title="title_edit_teamsoul" title="编辑项目成员配置">⚙</button>
+                                                <button class="proj-action-icon" data-action="edit-project-rules" data-i18n-title="title_edit_project_rules" title="编辑项目规则">📜</button>
+                                                <button class="proj-action-icon danger" data-action="delete-project" data-i18n-title="title_delete_project" title="删除项目">🗑</button>
+                                            </div>
+                                        </div>
+                                    </template>
+                                </div>
+                            </div>
+                        </template>
+                    </div>
+                </div>
+                <!-- 工具卡片 -->
+                <div class="sidebar-card" :class="{ active: sidebarTab === 'tools' }" data-tab="tools">
+                    <div class="card-title" style="position:relative;">
+                        <span data-i18n="sidebar_tools_title">技能</span><span class="skill-count" id="skill-count" style="margin-left:2px"></span>
+                        <button id="btn-install-skill" data-i18n-title="skill_install_title" title="安装技能" style="position:absolute;right:8px;top:50%;transform:translateY(-50%);background:none;border:1px solid var(--border-color);border-radius:4px;cursor:pointer;padding:2px 5px;line-height:1;color:var(--text-secondary)"><svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="2"><path d="M7 1v12M1 7h12"/></svg></button>
+                    </div>
+                    <div id="tools-list" class="card-list">
+                        <!-- 待填充 -->
+                    </div>
+                </div>
+            </div>
+            <!-- 拖拽调整手柄 -->
+            <div class="sidebar-resize-handle" id="sidebar-resize"></div>
+        </aside>
+        <!-- 主内容区：消息流 -->
+        <main class="flex-1 flex flex-col min-w-0">
+            <!-- 顶部栏 -->
+            <header class="px-6 py-4 border-b border-[var(--border-color)] flex items-center justify-between bg-[var(--bg-secondary)]">
+                <div class="flex items-center gap-3">
+                    <img src="png/logo-main.png" alt="CoordClaw" class="h-14 w-14 object-contain">
+                    <div>
+                        <div style="display:flex;align-items:center;gap:6px">
+                            <h1 class="font-bold text-lg" data-i18n="page_heading" style="margin:0">CoordClaw 控制中心</h1>
+                        </div>
+                        <p class="text-xs text-[var(--text-secondary)] mt-0.5" style="display:flex;align-items:center;gap:8px">
+                            <span id="msg-count">—</span>
+                            <span id="last-update">—</span>
+                            <a id="update-link" href="#" target="_blank" class="hidden text-xs" style="color:#f97316;text-underline-offset:2px"></a>
+                        </p>
+                    </div>
+                </div>
+                <div class="flex items-center gap-3">
+                    <button id="btn-mark-all" class="btn btn-ghost" data-i18n="msg_mark_all">全部已读</button>
+                    <input id="filter-keyword" type="text" data-i18n-placeholder="filter_keyword_placeholder" placeholder="关键字..." class="bg-[var(--bg-primary)] text-[var(--text-primary)] border border-[var(--border-color)] rounded-lg px-2 py-1 text-xs w-24">
+                    <select id="filter-sender" class="bg-[var(--bg-primary)] text-[var(--text-primary)] border border-[var(--border-color)] rounded-lg px-2 py-1 text-xs">
+                        <option value="" data-i18n="msg_filter_sender">发送者</option>
+                        <template x-for="name in filterMemberNames" :key="name">
+                            <option :value="name" x-text="name"></option>
+                        </template>
+                    </select>
+                    <select id="filter-recipient" class="bg-[var(--bg-primary)] text-[var(--text-primary)] border border-[var(--border-color)] rounded-lg px-2 py-1 text-xs">
+                        <option value="" data-i18n="msg_filter_recipient">接收者</option>
+                        <template x-for="name in filterMemberNames" :key="name">
+                            <option :value="name" x-text="name"></option>
+                        </template>
+                    </select>
+                    <select id="filter-read" class="bg-[var(--bg-primary)] text-[var(--text-primary)] border border-[var(--border-color)] rounded-lg px-2 py-1 text-xs">
+                        <option value="" data-i18n="msg_filter_read_all">全部</option>
+                        <option value="unread" data-i18n="msg_filter_unread">未读</option>
+                        <option value="read" data-i18n="msg_filter_read">已读</option>
+                    </select>
+                    <div class="flex items-center gap-1">
+                        <div class="relative">
+                            <button class="btn btn-ghost" @click="toggleExportDropdown()" data-i18n-title="msg_export" title="导出">⬇️</button>
+                            <div class="lang-menu" x-show="exportDropdown" @click.outside="exportDropdown = false" x-cloak>
+                                <div class="lang-item" @click="exportMessages('csv')" data-i18n="msg_export_csv">导出 CSV</div>
+                                <div class="lang-item" @click="exportMessages('html')" data-i18n="msg_export_html">导出 HTML</div>
+                            </div>
+                        </div>
+                        <div class="relative">
+                            <button class="btn btn-ghost" @click="toggleLangDropdown()" data-i18n-title="lang_title" title="切换语言" x-html="getLocaleIcon()">🌐</button>
+                            <div class="lang-menu" x-show="langDropdown" @click.outside="langDropdown = false" x-cloak>
+                                <template x-for="l in langList" :key="l.id">
+                                    <div class="lang-item" :class="{ active: l.id === locale }" @click="setLanguage(l.id)" x-text="l.label"></div>
+                                </template>
+                            </div>
+                        </div>
+                        <button class="btn btn-ghost" @click="toggleTheme()" data-i18n-title="theme_title" title="切换主题" x-text="getThemeIcon()">🌓</button>
+                        <button id="btn-manage-platforms" class="btn btn-ghost" data-i18n-title="menu_manage_platforms_title" title="管理平台">⚙️</button>
+                    </div>
+                    <div style="display:flex;flex-direction:column;gap:1px;margin-left:4px">
+                        <div style="display:flex;align-items:center;gap:3px">
+                            <span class="status-dot" :class="'status-' + sseStatus" title="SSE"></span>
+                            <span data-i18n="status_data_flow" style="font-size:10px;color:var(--text-secondary)">数据流</span>
+                        </div>
+                        <div style="display:flex;align-items:center;gap:3px">
+                            <span class="status-dot" :class="'status-' + gatewayStatus" title="Gateway"></span>
+                            <span x-text="gatewayStatus === 'connected' ? 'Gateway' : 'Gateway'" style="font-size:10px;color:var(--text-secondary)"></span>
+                        </div>
+                    </div>
+                </div>
+            </header>
+            <!-- 消息列表 -->
+            <div id="message-list" class="flex-1 overflow-y-auto p-4 space-y-3 relative" role="feed" data-i18n-aria="aria_message_list" aria-label="消息列表">
+                <div id="msg-inner" class="space-y-3">
+                    <!-- 动态填充 -->
+                </div>
+                <!-- 回到最新按钮（浮在消息列表底部） -->
+                <div class="stl-wrapper" x-show="isScrolledUp" :class="{ 'has-new-messages': hasNewMessages }">
+                    <button id="scroll-to-latest" class="stl-btn" data-i18n-title="msg_scroll_title" title="回到最新消息" data-i18n-aria="msg_scroll_title" aria-label="回到最新消息">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                            <polyline points="6 9 12 15 18 9"/>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+            <!-- 消息输入区 -->
+            <div id="message-input-area">
+                <div id="input-body">
+                    <textarea id="message-input" data-i18n-placeholder="input_placeholder" placeholder="输入消息..." rows="3"></textarea>
+                    <span id="char-count">0</span>
+                </div>
+                <div id="input-controls-row">
+                    <div id="input-controls">
+                        <select id="input-sender">
+                            <option value="" data-i18n="input_select_identity">选择身份...</option>
+                            <template x-for="item in inputDropdownItems" :key="item.value">
+                                <option :value="item.value" x-text="item.label"></option>
+                            </template>
+                        </select>
+                        <span id="input-direction">→</span>
+                        <select id="input-recipient">
+                            <option value="" data-i18n="input_select_recipient">选择接收者...</option>
+                            <template x-for="name in inputMemberNames" :key="name">
+                                <option :value="name" x-text="name"></option>
+                            </template>
+                        </select>
+                        <select id="input-model" style="max-width:180px" title="全局模型">
+                            <option value="" data-i18n="model_loading">加载中...</option>
+                        </select>
+                    </div>
+                    <button id="btn-send-message" data-i18n-title="input_send_title" title="发送">➤</button>
+                </div>
+            </div>
+        </main>
+        </div>
+    </div>
+    <!-- 模态弹窗（Alpine 管理） -->
+    <div x-data="modalState()" class="modal-overlay" x-show="open" x-cloak @click.self="close()">
+        <div id="modal-box" class="modal-box">
+            <div class="modal-title" x-text="title"></div>
+            <div id="modal-body" class="modal-body" x-html="body"></div>
+            <div class="modal-footer" x-ref="footer">
+                <button class="btn btn-primary" @click="close()" data-i18n="modal_confirm">确定</button>
+            </div>
+        </div>
+    </div>
+    <script src="js/i18n-dict.js?v=11"></script>
+    <script src="js/lang-detect.js?v=2"></script>
+    <script src="js/i18n.js?v=7"></script>
+    <script src="js/sse-client.js?v=4"></script>
+    <script src="js/ui.js?v=6"></script>
+    <script src="js/app-state.js?v=8"></script>
+    <script src="js/services/api.js?v=12"></script>
+    <script src="js/modules/chat.js?v=13"></script>
+    <script src="js/modules/sidebar.js?v=5"></script>
+    <script src="js/modules/toggle.js?v=5"></script>
+    <script src="js/modules/skills.js?v=5"></script>
+    <script src="js/modules/model.js?v=5"></script>
+    <script src="js/modules/projects.js?v=7"></script>
+    <script src="js/modules/teams.js?v=8"></script>
+    <script src="js/modules/dashboard.js?v=5"></script>
+    <script src="js/modules/messages.js?v=7"></script>
+    <script src="js/app-main.js?v=18"></script>
+</body>
+</html>

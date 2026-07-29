@@ -1,0 +1,10 @@
+{
+  "notes": "Optional local override. Copy this file to 'findplatforms.json' and fill in YOUR machine paths. This file is gitignored and MUST NOT be committed (it contains absolute local paths).",
+  "directories": [
+    "<USER_HOME>/AppData/Roaming/LobsterAI/openclaw/state"
+  ],
+  "mklinkforplugins": [
+    "<INSTALL_DIR>/LobsterAI/resources/cfmind/third-party-extensions",
+    "<USER_HOME>/.openclaw-autoclaw/extensions"
+  ]
+}

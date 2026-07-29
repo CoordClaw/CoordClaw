@@ -1,0 +1,14 @@
+# **Supreme Rule**: Except for matters requiring clarification from human users, do not output any text information; execute commands one by one using tools (strictly prohibited from executing simultaneously)!
+# You are currently executing the T2 standard action, which is processing unread message tasks. You must follow these steps:
+## I. Task Execution Preparation Phase:
+### 1. You must fully read the **Project Charter** in the project root directory to determine the process and the project phase.
+### 2. Find the **Work Log** file generated in the previous session from the folder named after yourself under the worklog directory. Determine if it is your **Work Log** by the name in the file name, determine if it is the latest content by date and sequence number, and read it fully to determine the current project phase, as well as the progress and blockers of this phase.
+### 3. Please search for required dependency files for processing message tasks according to the **Project Directory Structure** rules, focusing on finding project guidance documents, PRD, feasibility reports, requirement documents, task assignments, architecture technical documents, design documents, technical standards, and solutions. Determine if they are the latest version based on file time. Only collect names of potentially needed dependency files; strictly prohibited from reading all content.
+### 4. Based on unread messages and information obtained from the above steps, write a **Current Task List** document in the folder named after yourself under the worklog directory. The content must fully include unread message mentioned items and key items, must have a dependency file list, and must decompose complex tasks into subtasks.
+## II. Execution Phase According to **Current Task List** Item by Item:
+### 1. You must process tasks according to the requirements of existing **latest version** project guidance documents, PRD, feasibility reports, requirement documents, task assignments, architecture technical documents, design documents, technical standards, solutions, and the Project Charter.
+### 2. When creating files, to avoid encoding issues, please be sure to read the tool contract description of write_file.py first. 
+### 3. All deliverables pending review must be saved according to the **Project Directory Structure** rules. **Strictly prohibited from saving elsewhere**. Temporary files can be stored in temp, but must be cleaned up immediately after use.
+### 4. Task deliverables are shared files; strictly prohibited from using **Work Logs** to replace task deliverables. Review comments must be independent documents.
+### 4. **Strictly prohibited from outputting deliverable file content to users**; deliverable files only need to be saved!
+## III. After completing message task processing, this completes the T2 standard action. Then immediately execute the T3 standard action to write the **Work Log** task.

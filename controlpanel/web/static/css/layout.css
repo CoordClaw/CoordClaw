@@ -1,0 +1,376 @@
+/* ============================================================
+   Layout — CoordClaw Control Panel
+   
+   页面布局规则：侧边栏、内容区、卡片网格、弹窗等。
+   来源：style.css 拆分
+   ============================================================ */
+
+/* ═══════════════════════════════
+   Sidebar Layout
+   ═══════════════════════════════ */
+.sidebar {
+  display: flex;
+  flex-shrink: 0;
+  position: relative;
+  background: var(--bg-secondary);
+  border-right: 1px solid var(--border-color);
+  transition: width 0.2s ease;
+}
+
+/* 图标导航条 */
+.sidebar-rail {
+  width: 40px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 8px 0;
+  gap: 4px;
+  background: color-mix(in srgb, var(--bg-primary) 40%, var(--bg-secondary));
+  border-right: 1px solid var(--border-color);
+  z-index: 1;
+}
+
+.rail-tab {
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  opacity: 0.6;
+}
+
+.rail-tab:hover {
+  opacity: 1;
+  background: var(--bg-primary);
+  border-color: var(--border-color);
+}
+
+.rail-tab.active {
+  opacity: 1;
+  background: var(--accent-blue);
+  border-color: var(--accent-blue);
+  box-shadow: 0 2px 8px rgba(59, 130, 246, 0.3);
+}
+
+.rail-spacer {
+  flex: 1;
+}
+
+.rail-collapse {
+  font-size: 12px;
+  opacity: 0.5;
+}
+
+.rail-collapse:hover {
+  opacity: 1;
+}
+
+/* 卡片内容区 */
+.sidebar-content {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  position: relative;
+}
+
+/* 卡片 */
+.sidebar-card {
+  border-radius: var(--border-radius-lg) var(--border-radius-lg) 0 0;
+  background: var(--bg-card);
+  display: none;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+  animation: card-fade-in 0.15s ease;
+}
+
+.sidebar-card.active {
+  display: flex;
+}
+
+@keyframes card-fade-in {
+  from { opacity: 0; transform: translateX(6px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+/* ═══════════════════════════════
+   Sidebar Resize
+   ═══════════════════════════════ */
+.sidebar-resize-handle {
+  position: absolute;
+  top: 0;
+  right: -3px;
+  width: 6px;
+  height: 100%;
+  overflow: hidden;
+  cursor: col-resize;
+  z-index: 10;
+  transition: background 0.15s ease;
+}
+
+.sidebar-resize-handle:hover,
+.sidebar-resize-handle.resizing {
+  background: var(--accent-blue);
+  opacity: 0.5;
+}
+
+/* 收起状态 */
+.sidebar.collapsed .sidebar-content,
+.sidebar.collapsed .sidebar-resize-handle {
+  display: none;
+}
+
+.sidebar.collapsed {
+  width: 40px !important;
+}
+
+.sidebar.collapsed .rail-collapse {
+  transform: rotate(180deg);
+}
+
+/* 用户选择禁止（拖拽时） */
+body.sidebar-resizing {
+  user-select: none !important;
+  cursor: col-resize !important;
+}
+
+body.sidebar-resizing iframe,
+body.sidebar-resizing * {
+  pointer-events: none !important;
+}
+
+/* ═══════════════════════════════
+   Sidebar / Main Visual Partition
+   ═══════════════════════════════ */
+#sidebar {
+  background: var(--bg-secondary);
+}
+
+main {
+  background: var(--bg-primary);
+}
+
+/* ═══════════════════════════════
+   Modal Layout
+   ═══════════════════════════════ */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+  animation: modal-fade-in 0.15s ease;
+}
+
+@keyframes modal-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.modal-box {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  padding: 12px;
+  min-width: 360px;
+  max-width: 520px;
+  width: 520px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+  animation: modal-slide-in 0.2s ease;
+}
+
+@keyframes modal-slide-in {
+  from { transform: translateY(-20px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+.modal-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 8px;
+}
+
+.modal-body {
+  font-size: 14px;
+  color: var(--text-secondary);
+  line-height: 1.6;
+  margin-bottom: 12px;
+  word-break: break-word;
+}
+
+.modal-footer {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.modal-footer .btn {
+  min-width: 80px;
+}
+
+/* ═══════════════════════════════
+   Chat Widget Modal Layout
+   ═══════════════════════════════ */
+.chat-widget-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  background: rgba(0,0,0,0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.chat-widget-modal {
+  background: var(--bg-primary);
+  border-radius: 12px;
+  width: 560px;
+  max-width: 90vw;
+  max-height: 80vh;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+}
+
+.chat-widget-modal-wide {
+  width: 800px;
+}
+
+/* ═══════════════════════════════
+   Project Switch Modal Layout
+   ═══════════════════════════════ */
+.project-switch-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: fade-in 0.15s ease;
+}
+
+.project-switch-modal {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  padding: 12px;
+  width: 420px;
+  max-width: 90vw;
+  max-height: 70vh;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+}
+
+.project-switch-modal-header {
+  padding: 0 0 8px;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text-primary);
+  border-bottom: 1px solid var(--border-color);
+}
+
+.project-switch-modal-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px 0;
+  border-top: 1px solid var(--border-color);
+  border-bottom: 1px solid var(--border-color);
+}
+
+.project-switch-modal-footer {
+  padding: 8px 0 0;
+  border-top: 1px solid var(--border-color);
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* ═══════════════════════════════
+   Scroll-to-Latest Indicator
+   ═══════════════════════════════ */
+
+/* 容器：浮动在消息列表底部居中，覆盖在内容之上 */
+.stl-wrapper {
+  position: sticky;
+  bottom: 8px;
+  display: flex;
+  justify-content: center;
+  z-index: 50;
+  animation: stl-fade-in-up 0.3s ease-out;
+}
+
+/* Alpine x-show 控制显示/隐藏 */
+
+@keyframes stl-fade-in-up {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* 按钮本身 — 圆形箭头 */
+.stl-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  background: var(--accent-blue, #3b82f6);
+  color: #ffffff;
+  border: none;
+  border-radius: 50%;
+  cursor: pointer;
+  box-shadow:
+    0 2px 8px rgba(59, 130, 246, 0.35),
+    0 1px 3px rgba(0, 0, 0, 0.1);
+  transition: all 0.25s ease;
+  outline: none;
+}
+.stl-btn svg {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+}
+
+.stl-btn:hover {
+  background: #2563eb;
+  box-shadow:
+    0 4px 12px rgba(59, 130, 246, 0.5),
+    0 2px 4px rgba(0, 0, 0, 0.15);
+  transform: translateY(-2px);
+}
+.stl-btn:hover svg {
+  transform: translateY(2px);
+}
+.stl-btn svg {
+  transition: transform 0.3s ease;
+}
+
+.stl-btn:active {
+  transform: translateY(0);
+  box-shadow: 0 2px 8px rgba(59, 130, 246, 0.3);
+}

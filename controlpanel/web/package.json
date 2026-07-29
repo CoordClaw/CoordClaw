@@ -1,0 +1,28 @@
+{
+  "name": "coordclaw-controlpanel",
+  "version": "2.9.0",
+  "description": "CoordClaw 控制面板 - 多智能体团队协调中心",
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "config": {
+    "port": 18790,
+    "user": "admin",
+    "corsOrigin": "*",
+    "runtime": "browser",
+    "defaultLanguage": "zh"
+  },
+  "scripts": {
+    "dev": "tsc && node scripts/copy-static.cjs && tsx watch src/index.ts",
+    "build": "tsc && node scripts/copy-static.cjs",
+    "start": "node dist/index.js",
+    "start:dev": "tsx src/index.ts"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "sharp": "^0.35.3",
+    "tsx": "^4.0.0",
+    "typescript": "^5.9.3"
+  }
+}

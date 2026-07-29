@@ -1,0 +1,55 @@
+{
+  "id": "coordclawcenter",
+  "name": "CoordClawCenter",
+  "version": "19.50",
+  "description": "v19.50 - 代码质量重构：register() 拆分、补丁共享库提取、移除 sessions.json 依赖、全局 Map 级联清理、健康轮询兜底。WebChat Widget SDK + project-switch。",
+  "main": "index.ts",
+  "entry": "./dist/index.js",
+  "skills": ["./skills"],
+  "activation": {
+    "onStartup": true
+  },
+  "configSchema": {
+    "type": "object",
+    "properties": {
+      "coordclawJsonPath": {
+        "type": "string",
+        "description": "coordclaw.json配置文件路径（用于定位项目根目录）"
+      },
+      "cacheTtlMs": {
+        "type": "number",
+        "description": "缓存有效期（毫秒），默认60000"
+      },
+      "channels": {
+        "type": "object",
+        "properties": {
+          "webchat": {
+            "type": "object",
+            "properties": {
+              "css": {
+                "type": "object",
+                "description": "CSS 变量覆盖，如 {\"--bg\": \"#0f172a\", \"--accent\": \"#6366f1\"}",
+                "additionalProperties": { "type": "string" }
+              },
+              "cssText": {
+                "type": "string",
+                "description": "完整自定义 CSS 字符串"
+              },
+              "title": {
+                "type": "string",
+                "description": "聊天窗口标题"
+              },
+              "placeholder": {
+                "type": "string",
+                "description": "输入框占位文字"
+              }
+            },
+            "additionalProperties": true
+          }
+        },
+        "additionalProperties": true
+      }
+    },
+    "additionalProperties": true
+  }
+}

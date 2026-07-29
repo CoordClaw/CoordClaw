@@ -1,0 +1,36 @@
+{
+  "name": "@coordclaw/coordinationcenter",
+  "version": "19.50.0",
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "openclaw": {
+    "setupEntry": "./index.ts",
+    "extensions": [
+      "./index.ts",
+      "./dist/index.js"
+    ],
+    "compat": {
+      "pluginApi": ">=2026.3.24-beta.2",
+      "minGatewayVersion": "2026.3.24-beta.2"
+    },
+    "build": {
+      "openclawVersion": "2026.4.5",
+      "pluginSdkVersion": "2026.4.5"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json && esbuild index.ts --bundle --platform=node --format=esm --outfile=dist/index.js --external:openclaw --external:@openclaw/*",
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "license": "MIT",
+  "devDependencies": {
+    "@types/node": "^25.6.2",
+    "esbuild": "^0.25",
+    "typescript": "^6.0.3"
+  },
+  "dependencies": {
+    "gpt-tokenizer": "^3.4.0"
+  }
+}

@@ -1,0 +1,46 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+*.tsbuildinfo
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# OS
+.DS_Store
+Thumbs.db
+*.pid
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# WorkBuddy (project data, not source)
+.workbuddy/
+
+# Backups
+backups/
+
+# Logs
+*.log
+logs/
+
+# Temporary
+*.tmp
+*.bak*
+
+# Local config (user-specific machine paths — DO NOT COMMIT; see findplatforms.json.example)
+findplatforms.json
+
+# Dev/temp scripts & non-publish assets (dir is literally named "do not upload to github")
+/不上传github文件/
+
+# Generated static assets (built by scripts/copy-static.cjs; not authored source)
+controlpanel/web/static/js/i18n-dict.js
+controlpanel/web/static/js/lang-detect.js

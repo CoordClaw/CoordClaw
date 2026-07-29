@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CoordClaw — 安装</title>
+<link rel="stylesheet" href="css/install.css?v=1">
+</head>
+<body>
+
+<canvas id="bg-canvas"></canvas>
+
+<div class="philosophy-bottom">
+  <div class="philo-text visible" id="philo"></div>
+</div>
+
+<div class="container" id="app">
+  <div class="logo">Coord<span class="logo-accent">Claw</span><span class="logo-sub" id="logo-sub"> 多智能体协作系统</span></div>
+  <div class="hook" id="hook">真·一人公司 AI 团队</div>
+  <div class="subtitle" id="subtitle"></div>
+
+  <div class="steps">
+    <div class="step active" id="s1"></div>
+    <div class="step" id="s2"></div>
+    <div class="step" id="s3"></div>
+  </div>
+
+  <!-- 步骤 1: 语言 -->
+  <div class="card" id="step-lang">
+    <div class="card-title" id="lang-title"></div>
+    <div class="card-desc" id="lang-desc"></div>
+    <div class="lang-grid">
+      <button class="lang-btn" onclick="selectLang('zh')" id="lang-zh">
+        <span class="lang">中文</span><span class="detail">管理学管理智能体是真正的团队协作</span>
+      </button>
+      <button class="lang-btn" onclick="selectLang('en')" id="lang-en">
+        <span class="lang">English</span><span class="detail">Managing AI agents is real team collaboration</span>
+      </button>
+    </div>
+    <div class="actions" style="margin-top:20px">
+      <button class="btn btn-primary" id="btn-next-lang" disabled onclick="toStep(2)" data-zh="下一步" data-en="Next"></button>
+    </div>
+  </div>
+
+  <!-- 步骤 2: 平台 -->
+  <div class="card hidden" id="step-platforms">
+    <div class="card-title" id="plat-title"></div>
+    <div class="card-desc" id="plat-desc"></div>
+    <div class="platform-list" id="platform-list"></div>
+    <div class="actions" style="margin-top:20px;display:flex;gap:10px">
+      <button class="btn btn-secondary" onclick="toStep(1)" data-zh="上一步" data-en="Back"></button>
+      <button class="btn btn-primary" id="btn-install" disabled onclick="doInstall()" data-zh="安装" data-en="Install"></button>
+      <button class="btn btn-primary" id="btn-enter" style="display:none" onclick="enterCoordClaw()" data-zh="进入 CoordClaw" data-en="Enter CoordClaw"></button>
+    </div>
+    <div class="status-msg" id="install-status"></div>
+  </div>
+
+  <!-- 步骤 3: 完成 -->
+  <div class="card hidden" id="step-done">
+    <div class="done-icon"></div>
+    <div class="card-title" style="text-align:center" id="done-title"></div>
+    <div class="card-desc" style="text-align:center" id="done-summary"></div>
+    <div class="done-list" id="done-list"></div>
+    <div class="card-desc" style="text-align:center;color:var(--warn);font-weight:600;margin-top:8px" id="done-restart"></div>
+    <div class="card-desc" style="text-align:center" id="done-hint"></div>
+    <div class="actions" style="text-align:center;margin-top:20px">
+      <button class="btn btn-primary" onclick="enterCoordClaw()" data-zh="进入 CoordClaw" data-en="Enter CoordClaw"></button>
+    </div>
+  </div>
+</div>
+
+<script src="js/lang-detect.js?v=2"></script>
+    <script src="js/install.js?v=4"></script>
+</body>
+</html>

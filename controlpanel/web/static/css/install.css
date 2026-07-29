@@ -1,0 +1,90 @@
+/* ══════════════════════════════════════════════
+   install.css — CoordClaw 安装向导样式
+   依赖：无，独立加载
+   ══════════════════════════════════════════════ */
+
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#080c14;--bg2:#0f1523;--bg3:#151d31;--border:#1e2a42;
+  --text:#c8d0e0;--dim:#6a7490;--accent:#5b8def;--accent2:#3d6dd4;
+  --green:#3ecf8e;--warn:#f0a040;--red:#e05060;
+  --radius:8px;--radius-lg:12px;
+}
+body{font-family:"Inter","Segoe UI",system-ui,-apple-system,sans-serif;background:var(--bg);color:var(--text);min-height:100vh;overflow-x:hidden}
+a{color:var(--accent);text-decoration:none}
+
+/* ── 七彩烟雾背景 ── */
+#bg-canvas{position:fixed;top:0;left:0;width:100%;height:100%;z-index:0;opacity:1}
+
+/* ── 主容器 ── */
+.container{position:relative;z-index:1;max-width:900px;margin:0 auto;padding:60px 24px 120px}
+.logo{font-size:32px;font-weight:700;letter-spacing:-.01em;margin-bottom:2px;color:#fff}
+.logo-accent{color:var(--accent)}
+.logo-sub{color:#fff;font-size:32px;font-weight:700}
+.hook{font-size:28px;font-weight:700;color:#fff;margin-bottom:10px;letter-spacing:.02em}
+.subtitle{color:var(--dim);font-size:13px;line-height:1.6;margin-bottom:40px}
+
+/* ── 步骤导航 ── */
+.steps{display:flex;gap:4px;margin-bottom:36px}
+.step{flex:1;height:3px;background:var(--border);border-radius:3px;transition:background .4s}
+.step.active{background:var(--accent)}
+.step.done{background:var(--green)}
+
+/* ── 卡片 ── */
+.card{background:rgba(15,21,35,.92);border:1px solid var(--border);border-radius:var(--radius-lg);padding:28px 32px;margin-bottom:20px;backdrop-filter:blur(12px);transition:border-color .3s}
+.card:hover{border-color:#2a3a5a}
+.card-title{font-size:15px;font-weight:600;margin-bottom:6px}
+.card-desc{font-size:12px;color:var(--dim);line-height:1.6;margin-bottom:20px}
+
+/* ── 语言选择 ── */
+.lang-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.lang-btn{padding:16px 20px;background:var(--bg3);border:2px solid var(--border);border-radius:var(--radius);cursor:pointer;text-align:left;transition:all .2s;color:var(--text);font-size:14px}
+.lang-btn:hover{border-color:var(--accent);background:#1a2540}
+.lang-btn.selected{border-color:var(--accent);background:#1a2d50;box-shadow:0 0 0 1px var(--accent)}
+.lang-btn .lang{font-weight:600;display:block;margin-bottom:4px}
+.lang-btn .detail{font-size:11px;color:var(--dim)}
+
+/* ── 平台选择 ── */
+.platform-list{display:flex;flex-direction:column;gap:8px}
+.platform-item{display:flex;align-items:center;gap:12px;padding:14px 18px;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);cursor:pointer;transition:all .2s}
+.platform-item:hover{border-color:var(--accent)}
+.platform-item.selected{border-color:var(--accent);background:#1a2d50}
+.platform-check{width:20px;height:20px;border:2px solid var(--border);border-radius:4px;flex-shrink:0;display:flex;align-items:center;justify-content:center;transition:all .2s}
+.platform-item.selected .platform-check{background:var(--accent);border-color:var(--accent)}
+.platform-check::after{content:'';width:10px;height:6px;border:2px solid #fff;border-top:0;border-right:0;transform:rotate(-45deg) translateY(-1px);opacity:0;transition:opacity .2s}
+.platform-item.selected .platform-check::after{opacity:1}
+.platform-name{font-size:14px;font-weight:500;flex:1}
+.platform-badge{font-size:10px;padding:3px 8px;border-radius:12px;font-weight:500}
+.platform-badge.installed{background:#1a3a2a;color:var(--green)}
+.platform-badge.new{background:#2a2518;color:var(--warn)}
+.scanning{display:flex;align-items:center;gap:8px;color:var(--dim);font-size:13px;padding:12px 0}
+.scanning .dot{width:6px;height:6px;border-radius:50%;background:var(--accent);animation:pulse 1.2s ease-in-out infinite}
+.scanning .dot:nth-child(2){animation-delay:.2s}
+.scanning .dot:nth-child(3){animation-delay:.4s}
+@keyframes pulse{0%,80%,100%{opacity:.2;transform:scale(.8)}40%{opacity:1;transform:scale(1.2)}}
+
+/* ── 底部理念轮播 ── */
+.philosophy-bottom{position:fixed;top:50%;left:0;right:0;z-index:1;text-align:center;pointer-events:none;transform:translateY(280px)}
+.philo-text{font-size:40px;font-weight:300;color:#fff;letter-spacing:.06em;opacity:0;transition:opacity 2s ease;display:inline-block}
+.philo-text.visible{opacity:.9}
+
+/* ── 按钮 ── */
+.actions{margin-top:8px}
+.btn{display:inline-flex;align-items:center;gap:8px;padding:12px 28px;border-radius:var(--radius);font-size:14px;font-weight:600;cursor:pointer;border:none;transition:all .2s}
+.btn:disabled{opacity:.4;cursor:not-allowed}
+.btn-primary{background:var(--accent);color:#fff}
+.btn-primary:hover:not(:disabled){background:var(--accent2)}
+.btn-secondary{background:var(--bg3);color:var(--text);border:1px solid var(--border)}
+.btn-secondary:hover:not(:disabled){border-color:var(--accent)}
+.status-msg{font-size:13px;margin-top:16px;padding:12px 16px;border-radius:var(--radius);display:none}
+.status-msg.show{display:block}
+.status-msg.success{background:#0f2a1f;color:var(--green);border:1px solid #1a4a35}
+.status-msg.error{background:#2a1518;color:var(--red);border:1px solid #4a2525}
+
+/* ── 完成页 ── */
+.done-icon{width:64px;height:64px;border-radius:50%;background:#0f2a1f;border:2px solid var(--green);display:flex;align-items:center;justify-content:center;margin:0 auto 24px}
+.done-icon::after{content:'';width:20px;height:12px;border:3px solid var(--green);border-top:0;border-right:0;transform:rotate(-45deg) translateY(-2px)}
+.done-list{display:flex;flex-direction:column;gap:8px;margin:16px 0}
+.done-item{display:flex;align-items:center;gap:10px;font-size:13px;color:var(--dim)}
+.done-item .icon{color:var(--green);font-weight:700}
+.hidden{display:none!important}

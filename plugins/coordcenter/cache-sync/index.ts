@@ -1,0 +1,1 @@
+export { registerCacheSyncRoute } from "./http-route";

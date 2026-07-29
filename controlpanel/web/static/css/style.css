@@ -1,0 +1,103 @@
+/* 覆盖 & 工具类 — 布局 → layout.css，组件 → components.css，状态 → state.css */
+
+/* ==================== 通用样式 ==================== */
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+
+/* ==================== 侧边栏团队信息区域 ==================== */
+
+#team-info {
+  background: color-mix(in srgb, var(--accent-blue) 10%, var(--bg-secondary));
+  border-bottom: 1px solid var(--accent-blue);
+}
+
+/* 技能弹窗列表容器上下分隔线 */
+#modal-body > div:first-child {
+  border-top: 1px solid var(--border-color);
+  border-bottom: 1px solid var(--border-color);
+}
+
+#team-info h2 {
+  color: var(--text-primary);
+  font-size: 14px;
+  font-weight: 500;
+}
+
+#project-info {
+  font-size: 12px;
+  line-height: 1.3;
+}
+
+#project-info .info-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 0;
+}
+
+#project-info .info-label {
+  color: var(--text-secondary);
+  min-width: 32px;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+#project-info .info-value {
+  color: var(--text-primary);
+  font-weight: 500;
+}
+
+#project-info .info-path {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  color: var(--text-primary);
+  font-weight: 500;
+}
+
+#project-info .info-path-inner {
+  display: inline-block;
+  white-space: nowrap;
+}
+
+#project-info .info-path-clickable {
+  cursor: pointer;
+  color: var(--accent-blue);
+}
+#project-info .info-path-clickable:hover {
+  text-decoration: underline;
+}
+
+/* ==================== 侧边栏成员列表区域 ==================== */
+
+#member-list {
+  background: var(--bg-secondary);
+}
+
+#member-list + div {
+  background: var(--bg-secondary);
+}
+
+#member-header {
+  font-size: 14px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-primary);
+  background: color-mix(in srgb, var(--accent-blue) 10%, var(--bg-secondary));
+  border-bottom: 1px solid var(--accent-blue);
+}
+
+/* 技能弹窗列表容器上下分隔线 */
+#modal-body > div:first-child {
+  border-top: 1px solid var(--border-color);
+  border-bottom: 1px solid var(--border-color);
+}

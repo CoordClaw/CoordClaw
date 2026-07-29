@@ -1,0 +1,151 @@
+/* ============================================================
+   Design Tokens — CoordClaw Control Panel
+   
+   所有视觉设计参数集中管理，改主题只需改此文件。
+   
+   ┌─ tokens.css ───── 设计变量定义（本文件）
+   ├─ components.css ─ 可复用组件（使用 tokens）
+   └─ style.css ────── 自定义样式（使用 tokens）
+   
+   ============================================================ */
+
+[x-cloak] { display: none !important; }
+
+/* 语言下拉菜单 */
+.lang-menu {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  margin-top: 4px;
+  background: var(--bg-secondary, #1e1e1e);
+  border: 1px solid var(--border-subtle, rgba(255,255,255,0.1));
+  border-radius: 8px;
+  padding: 4px 0;
+  min-width: 160px;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.3);
+  z-index: 200;
+}
+.lang-item {
+  padding: 8px 16px;
+  font-size: 13px;
+  cursor: pointer;
+  color: var(--text-primary);
+  transition: background 0.15s;
+}
+.lang-item:hover { background: var(--accent-blue, #3b82f6); color: #fff; }
+.lang-item.active { background: rgba(59,130,246,0.2); }
+
+/* 人类成员卡片金色外框 */
+.list-item-card.human-card {
+  border-color: #d4a017 !important;
+  box-shadow: 0 0 6px rgba(212,160,23,0.15);
+}
+
+/* ═══════════════════════════════════════════
+   暗色主题（默认）
+   ═══════════════════════════════════════════ */
+:root {
+  /* 背景 */
+  --bg-primary: #1a1a1a;
+  --bg-secondary: #2d2d2d;
+  --bg-card: #2d2d2d;
+  --bg-hover: #353535;
+  --bg-item-card: #232323;
+
+  /* 文字 */
+  --text-primary: #ffffff;
+  --text-secondary: #a6be39;
+
+  /* 主题色 */
+  --accent-blue: #3b82f6;
+  --accent-green: #10b981;
+  --accent-red: #ef4444;
+  --accent-yellow: #f59e0b;
+
+  /* 边框 */
+  --border-color: #404040;
+
+  /* 消息状态 */
+  --bg-unread: rgba(255, 180, 100, 0.18);
+  --bg-read: #2d2d2d;
+  --indicator-unread: #fbbf24;
+  --border-unread: rgba(251, 191, 36, 0.3);
+
+  /* 间距 */
+  --spacing-card-margin: 16px;
+  --spacing-card-padding: 16px;
+  --spacing-avatar-mr: 12px;
+  --spacing-name-mb: 4px;
+  --spacing-time-ml: 8px;
+
+  /* 圆角 */
+  --radius-card: 12px;
+  --radius-avatar: 50%;
+
+  /* 字体 */
+  --font-size-name: 14px;
+  --font-size-time: 12px;
+  --font-size-message: 14px;
+  --line-height: 20px;
+
+  /* 圆角 */
+  --border-radius-md: 8px;
+  --border-radius-lg: 12px;
+}
+
+/* ═══════════════════════════════════════════
+   亮色主题（JS 切换 html.light-theme）
+   ═══════════════════════════════════════════ */
+:root.light-theme {
+  --bg-primary: #f8f9fa;
+  --bg-secondary: #ffffff;
+  --bg-card: #ffffff;
+  --bg-hover: rgba(0,0,0,0.06);
+  --bg-item-card: #ffffff;
+
+  --text-primary: #1a1a2e;
+  --text-secondary: #6b6057;
+
+  --border-color: #d4d4d8;
+
+  --bg-unread: rgba(251, 146, 60, 0.10);
+  --bg-read: #ffffff;
+  --indicator-unread: #f97316;
+  --border-unread: rgba(251, 146, 60, 0.25);
+}
+
+/* 亮色主题下输入区特殊覆盖 */
+:root.light-theme #input-controls-row { background: var(--bg-primary); }
+:root.light-theme #input-body { background: var(--bg-read); }
+
+/* ═══════════════════════════════════════════
+   布局令牌（不受主题影响）
+   ═══════════════════════════════════════════ */
+:root {
+  --sidebar-rail-width: 48px;
+  --sidebar-content-width: 232px;
+  --sidebar-total-width: 280px;
+  --header-height: 56px;
+  --transition-fast: 150ms ease;
+}
+
+/* ═══════════════════════════════════════════
+   扩展令牌（用于未来组件化）
+   ═══════════════════════════════════════════ */
+:root {
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.1);
+  --shadow-md: 0 2px 8px rgba(0, 0, 0, 0.2);
+  --shadow-lg: 0 4px 16px rgba(0, 0, 0, 0.3);
+  
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+  
+  --space-xs: 4px;
+  --space-sm: 8px;
+  --space-md: 12px;
+  --space-lg: 16px;
+  --space-xl: 20px;
+  --space-3xl: 32px;
+}

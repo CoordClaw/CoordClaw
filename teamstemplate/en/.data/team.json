@@ -1,0 +1,129 @@
+{
+  "gatewayUrl": "http://127.0.0.1:60340",
+  "openclawUserDir": "C:\\Users\\Administrator\\.qclaw",
+  "team_name": "CoordClaw AI Team",
+  "project_name": "AI Agent Industry Analysis",
+  "version": "2.5",
+  "created_at": "2026-04-27",
+  "updated_at": "2026-05-13",
+  "auto_coordination": true,
+  "msg_robot": false,
+  "toolcallcheck": true,
+  "tool_injection_prompts": false,
+  "resetcontext": {
+    "internal_plugin": true,
+    "external_tools": false
+  },
+  "max_activations": 2,
+  "lifecycle_end_timeout_ms": 1800000,
+  "note": "Project description information",
+  "llm_error": {
+    "enabled": true,
+    "endcode": [
+      402,
+      429
+    ]
+  },
+  "checkmessagesrepeatedly": {
+    "reminder": {
+      "enabled": true,
+      "message": "[You have checked this message {count} times already. Please check your own work log for records!]"
+    },
+    "abort": {
+      "enabled": false,
+      "count": 2,
+      "message": "[CSR]"
+    }
+  },
+  "checkunread": {
+    "enabled": true,
+    "splice_role_prompt": true,
+    "message": [
+      "[New Task Reminder] 1. Project root directory is <#projectroot#>.\n2. T1 standard action is to use script to query complete unread messages: execute command with exec tool: `python <#projectroot#>/.data/scripts/chat_manager.py inbox --reader '<Name>' --last 20`, strictly prohibited to verbally say it has been queried.\n3. For subordinate [STATUS] messages, no reply is needed. After obtaining unread messages, please immediately execute T2 standard action."
+    ]
+  },
+  "checktaskstatus": {
+    "enabled": true,
+    "splice_role_prompt": false,
+    "message": [
+      "[Message Clear Reminder] 1. Team group chat system has no unread messages. Please send reminder messages to members who have not completed their tasks. Also, you decide whether the team task is completed, but please strictly audit tasks with a fault-finding, distrustful, and suspicious attitude. Do not easily conclude that the task is completed.\n2. If the team task is completed, please report to your superior (human user) in the group chat and form a document, and please stop sending group chat messages to avoid message loops.\n3. If the team task is not completed, please send group chat messages to notify relevant personnel to continue executing tasks. This is also mandatory!"
+    ]
+  },
+  "checktaskfeedback": {
+    "enabled": false,
+    "splice_role_prompt": false,
+    "message": [
+      "[Group Chat Feedback Reminder] **Previous sends do not count; must resend. Strictly prohibited to verbally say feedback was sent.**\n1. Did you not send a group chat message after completing this session?\n2. After completing T5, use exec tool to execute command: `python <#projectroot#>/.data/scripts/chat_manager.py send --from '<Your Name>' --to '<Recipient Name>' --content '<Message>'` for group chat feedback.\n3. Every session, even if there is no task, just chatting, also needs to send a group chat message to your superior to feedback your current status, i.e., execute T4 standard action.\n4. If you repeatedly receive this reminder, you need to confirm from the system prompt whether you are correctly using the script tool and whether the execution process is complete."
+    ]
+  },
+  "checkmemberstatus": {
+    "enabled": true,
+    "splice_role_prompt": false,
+    "message": [
+      "[Member Status Reminder] <#name#> has stopped responding but has not provided group chat feedback information."
+    ]
+  },
+  "checkdeadlockstatus": {
+    "enabled": false,
+    "splice_role_prompt": false,
+    "message": [
+      "Please do not check unread messages anymore. You just checked them, so the messages are empty. Stop thinking and immediately execute subsequent standard actions!"
+    ]
+  },
+  "checktoolcall": {
+    "enabled": false,
+    "splice_role_prompt": false,
+    "message": [
+      "[Tool Call Reminder] You did not call any tools in this session. Think about where your task has progressed. The project root directory is <#projectroot#>. **You must use the exec tool to execute commands.** Strictly prohibited to verbally say standard actions have been completed. Past completions do not count. Please use the script tool to complete group chat unread message retrieval or feedback sending!"
+    ]
+  },
+  "notify_first_member": false,
+  "humanmember": [
+    {
+      "enabled": true,
+      "human_id": "human-001",
+      "name": "Mr.Wang",
+      "role": "CEO"
+    }
+  ],
+  "members": [
+    {
+      "agent_id": "chenmo-pm-en",
+      "name": "ChenMo",
+      "role": "ProductManager",
+      "authority_level": "L4",
+      "direct_supervisor": "Mr.Wang",
+      "direct_subordinate": "ZhongYuan, FangHeng, SuXiao, BaiJin",
+      "sessionKey": "agent:chenmo-pm-en:dashboard:7a7cfa47-5911-4497-a7ee-b0ae5cb0a126",
+      "description": "Team initiator, responsible for requirement definition and team governance",
+      "role_prompt": [
+        "You have no memory. After each task, you must obtain project progress information through project structured documents, and execute T1/T2/T3/T4/T5 standard actions and complete tasks based on your role settings, job responsibilities, and group chat messages. You must execute tasks according to dependency files.\n"
+      ],
+      "append_message_prompts": {
+        "enabled": true,
+        "behind": true,
+        "message": [
+          "[All requirements and functions are based on project guidance documents. If the project guidance document cannot be found, please inform me immediately!]"
+        ]
+      }
+    }
+  ],
+  "compaction": {
+    "enabled": false,
+    "msg_count_threshold": 20,
+    "window_duration_minutes": 15,
+    "focus_instructions": "Please retain project development-related decisions, uncompleted tasks, and correct tool usage methods. Remove repetitive reasoning, circular thinking, invalid content, and incorrect cognition."
+  },
+  "context_optimization": {
+    "enabled": true,
+    "description": "Historical round tool message cleanup: Strip completed Round's toolCall/toolResult, only retain user messages and assistant pure text replies. Current active Round fully retains tool messages (dependency chain not interrupted). toolCall compressed to path summary: [toolName]: /path/to/file.",
+    "keep_recent_rounds": 1,
+    "discard_tool_result": true,
+    "compress_toolcall_to_summary": true,
+    "log_stats": true,
+    "note": "When enabled=true, automatically cleans historical message tool noise before each LLM call, reducing about 80% context waste. Recommended to enable after stable operation."
+  },
+  "llm_input_dump": {
+    "enabled": false
+  }
+}

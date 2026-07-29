@@ -1,0 +1,29 @@
+# Normalize line endings to LF on checkout/commit to avoid CRLF noise in diffs
+* text=auto eol=lf
+
+*.md text eol=lf
+*.ts text eol=lf
+*.tsx text eol=lf
+*.js text eol=lf
+*.cjs text eol=lf
+*.mjs text eol=lf
+*.json text eol=lf
+*.jsonc text eol=lf
+*.yaml text eol=lf
+*.yml text eol=lf
+*.py text eol=lf
+*.html text eol=lf
+*.css text eol=lf
+*.bat text eol=crlf
+
+# Binary assets — do not let Git try to diff/normalize these
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.svg binary
+*.ico binary
+*.db binary
+*.sqlite binary
+*.exe binary
+*.dll binary

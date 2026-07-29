@@ -1,0 +1,132 @@
+{
+  "gatewayUrl": "http://127.0.0.1:60340",
+  "openclawUserDir": "C:\\Users\\Administrator\\.qclaw",
+  "team_name": "CoordClaw AI团队",
+  "project_name":"AI智能体行业分析",
+  "version": "2.5",
+  "created_at": "2026-04-27",
+  "updated_at": "2026-05-13",
+  "auto_coordination": true,
+  "msg_robot": false,
+  "toolcallcheck": true,
+  "tool_injection_prompts": false,
+  "resetcontext": {
+    "internal_plugin": true,
+    "external_tools": false
+  },
+  "max_activations": 2,
+  "lifecycle_end_timeout_ms": 1800000,
+  "note": "项目描述信息",
+  "llm_error": {
+    "enabled": true,
+    "endcode": [
+      402,
+      429
+    ]
+  },
+  "checkmessagesrepeatedly":
+  {
+    "reminder":
+    {
+      "enabled": true,
+      "message": "【你已经重复查阅过该消息{count}次了，请查看你自己的工作日志是否有记录！】"
+    },
+    "abort":
+    {
+      "enabled": false,
+      "count":2,
+      "message":"[CSR]"
+    }
+  },
+  "checkunread": {
+    "enabled": true,
+    "splice_role_prompt": true,
+    "message": [
+      "【新任务提醒】1、项目根目录为<#projectroot#>。\n2、 T1标准动作为用脚本查询完整未读消息：exec工具执行命令：`python <#projectroot#>/.data/scripts/chat_manager.py' inbox --reader '<姓名>' --last 20`，禁止口头说已查询。\n3、对于下级[STATUS]消息不用回复，获取未读消息后请立刻执行T2标准动作。"
+    ]
+  },
+  "checktaskstatus": {
+    "enabled": true,
+    "splice_role_prompt": false,
+    "message": [
+      "【消息清空提醒】1、团队群聊系统已无未读消息，请向还没有完成任务的成员发送催促消息，另外你来决策团队任务是否完成，但请务必严格带着找茬、不信任、猜疑的态度审核任务，不要轻易下结论任务完成。\n2、如果团队任务完成，请在群聊中向你的上级（人类用户）汇报并形成文档，并请停止发送群聊消息，避免消息循环。\n3、如果团队任务未完成，请群聊重新通知相关人员继续执行任务，这也是必须的！"
+    ]
+  },
+  "checktaskfeedback": {
+    "enabled": false,
+    "splice_role_prompt": false,
+    "message": [
+      "【群聊反馈提醒】**之前发过不做数，要重新反馈，严禁口头说反馈了**\n1、你是不是完成本次会话后没有发送群聊消息？\n2、完成T5后使用exec工具执行命令：`python <#projectroot#>/.data/scripts/chat_manager.py send --from '<自己的姓名>' --to '<接收者姓名>' --content '<消息>'`进行群聊反馈。\n3、每一次会话，哪怕没有任何任务，只是聊天，也需要发送群聊消息向你的上级反馈你现在的状态，即执行T4标准动作。\n4、如果反复收到该提醒，你需要从系统提示词中确认是否正确使用脚本工具、执行流程是否完整。"
+    ]
+  },
+  "checkmemberstatus": {
+    "enabled": true,
+    "splice_role_prompt": false,
+    "message": [
+      "【成员状态提醒】<#name#>已经停止响应，但是没有进行群聊反馈信息。"
+    ]
+  },
+  "checkdeadlockstatus": {
+    "enabled": false,
+    "splice_role_prompt": false,
+    "message": [
+      "请不要查看未读消息了，你刚刚已经查看了，所以消息为空，停止思考，请立刻执行后续标准动作！"
+    ]
+  },
+  "checktoolcall": {
+    "enabled": false,
+    "splice_role_prompt": false,
+    "message": [
+      "【调用工具提醒】你本次会话没有调用工具，想想你任务进行到哪里了，项目根目录为<#projectroot#>，**要使用exec工具执行命令**，严禁口头说完成了标准动作执行，过去完成的不做数，请调用脚本工具完成群聊未读消息查收或者反馈发送！"
+    ]
+  },
+  "notify_first_member": false,
+  "humanmember": [
+    {
+    "enabled": true,
+    "human_id": "human-001",
+    "name": "王总",
+    "role": "CEO"
+    }
+  ],
+  "members": [
+    {
+      "agent_id": "chenmo-pm",
+      "name": "陈默",
+      "role": "产品经理",
+      "authority_level": "L4",
+      "direct_supervisor": "王总",
+      "direct_subordinate": "钟远、方衡、苏晓、白谨",
+      "sessionKey": "agent:chenmo-pm:dashboard:7a7cfa47-5911-4497-a7ee-b0ae5cb0a126",
+      "description": "团队发起人，负责需求定义和团队治理",
+      "role_prompt": [
+        "你没有记忆，每次任务你后必须通过项目结构化文档获取项目进度信息，并根据自己角色设定、岗位职责、群聊消息执行T1/T2/T3/T4/T5标准动作和完成任务，必须根据依赖文件执行任务。\n"
+      ],
+      "append_message_prompts": {
+        "enabled": true,
+        "behind": true,
+        "message": [
+          "【所有需求和功能都是基于项目指导下文档,如果找不到项目指导性文档请立刻告诉我！】"
+        ]
+      }
+    }
+  ],
+  "compaction": {
+    "enabled": false,
+    "msg_count_threshold": 20,
+    "window_duration_minutes": 15,
+    "focus_instructions": "请保留项目开发相关决策、未完成任务、正确的工具使用方法，去除重复推理、循环思考、无效内容、错误认知"
+  },
+  "context_optimization": {
+    "enabled": true,
+    "description": "历史轮次工具消息清理：剥离已完成Round的toolCall/toolResult，仅保留用户消息和助手纯文字回复。当前活跃Round完整保留工具消息（依赖链不中断）。toolCall压缩为路径摘要：[toolName]: /path/to/file。",
+    "keep_recent_rounds": 1,
+    "discard_tool_result": true,
+    "compress_toolcall_to_summary": true,
+    "log_stats": true,
+    "note": "enabled=true时，每轮LLM调用前自动清理历史消息中的tool噪音，可减少约80%上下文浪费。建议稳定运行后开启。"
+  },
+  "llm_input_dump": {
+    "enabled": false
+  }
+}
