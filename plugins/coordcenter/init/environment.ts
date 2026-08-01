@@ -9,6 +9,7 @@ import { initLogger, applyLogConfig, LogLevel, cleanOldLogFiles, debug, info, wa
 import { initDefaultPlaceholders } from "../shared/template";
 import { setConfigFallbackPaths, setUserDirFromRuntime, setCoordClawRoot, getCoordClawJsonPath, initPaths } from "../shared/paths";
 import { writeConfigJson } from "../shared/config-writer";
+import { readCoordClawJson } from "../shared/config-store";
 import { migrateCoordClawJson } from "./migrate";
 import { dumpRuntimePathDiagnostics } from "./diagnostics";
 import { fileURLToPath } from "node:url";
@@ -109,8 +110,7 @@ export function initEnvironment(api: any): BootContext {
   // ---- 日志配置 (from coordclaw.json) ----
   try {
     if (fs.existsSync(jsonPath)) {
-      const jsonRaw = fs.readFileSync(jsonPath, 'utf-8');
-      const jsonData = JSON.parse(jsonRaw);
+      const jsonData = readCoordClawJson(jsonPath);
       if (jsonData.logging) {
         const { level, modules: logModules } = jsonData.logging;
         const globalLevel = LogLevel[level as keyof typeof LogLevel] ?? undefined;

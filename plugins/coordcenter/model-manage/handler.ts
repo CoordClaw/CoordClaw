@@ -10,6 +10,8 @@
 import * as fs from "fs";
 import { debug, info, warn, getEventId } from "../shared/logger";
 import { getOpenClawJsonPath } from "../shared/paths";
+import { writeJsonSafe } from "../shared/json-atomic";
+import { readOpenClawJson } from "../shared/config-store";
 
 const MODULE = "model-manage";
 
@@ -54,7 +56,7 @@ export async function getModelList(): Promise<ModelListResult> {
     const scopeMap = new Map<string, string>();  // "provider/model" → scope
     const jsonPath = getOpenClawJsonPath();
     if (fs.existsSync(jsonPath)) {
-      const cfg = JSON.parse(fs.readFileSync(jsonPath, "utf-8"));
+      const cfg = readOpenClawJson();
       const defaultsModel = cfg.agents?.defaults?.model;
       const globalRef = defaultsModel?.primary as string | undefined;
       if (globalRef) scopeMap.set(globalRef, "global");
@@ -153,8 +155,7 @@ export async function setSessionModel(params: ModelSetParams): Promise<ModelSetR
       if (!fs.existsSync(jsonPath)) {
         details.agent = "error: openclaw.json not found";
       } else {
-        const raw = fs.readFileSync(jsonPath, "utf-8");
-        const data = JSON.parse(raw);
+        const data = readOpenClawJson();
         data.agents = data.agents || { defaults: {}, list: [] };
         const agent = (data.agents.list || []).find((a: any) => a.id === agentId);
         if (!agent) {
@@ -162,7 +163,7 @@ export async function setSessionModel(params: ModelSetParams): Promise<ModelSetR
         } else {
           agent.model = agent.model || {};
           agent.model.primary = modelVal;
-          fs.writeFileSync(jsonPath, JSON.stringify(data, null, 2), "utf-8");
+          writeJsonSafe(jsonPath, data);
           details.agent = "ok";
         }
       }
@@ -178,14 +179,13 @@ export async function setSessionModel(params: ModelSetParams): Promise<ModelSetR
       if (!fs.existsSync(jsonPath)) {
         details.global = "error: openclaw.json not found";
       } else {
-        const raw = fs.readFileSync(jsonPath, "utf-8");
-        const data = JSON.parse(raw);
+        const data = readOpenClawJson();
         data.agents = data.agents || { defaults: {}, list: [] };
         data.agents.defaults.model = data.agents.defaults.model || {};
         data.agents.defaults.model.primary = modelVal;
         // 真正的全局默认：清掉所有 per-agent 模型覆盖，使其统一继承 defaults
         for (const a of data.agents.list || []) delete a.model;
-        fs.writeFileSync(jsonPath, JSON.stringify(data, null, 2), "utf-8");
+        writeJsonSafe(jsonPath, data);
         details.global = "ok";
       }
     } catch (err: any) {

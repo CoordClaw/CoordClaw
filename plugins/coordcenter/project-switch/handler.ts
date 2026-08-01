@@ -26,6 +26,7 @@ import type {
   SwitchProjectResult,
 } from "./types";
 import { writeJsonSafe, writeJsonSafeOrThrow } from "../shared/json-atomic";
+import { readCoordClawJson, readJsonFile } from "../shared/config-store";
 
 const MODULE = "project-switch";
 
@@ -78,8 +79,7 @@ export async function switchProject(
   let targetProject: any;
 
   try {
-    const raw = fs.readFileSync(coordclawJsonPath, "utf-8");
-    coordclawData = JSON.parse(raw);
+    coordclawData = readCoordClawJson();
 
     const teams = coordclawData.teams || [];
     teamRecord = teams.find((t: any) => t.id === teamId);
@@ -178,8 +178,7 @@ export async function switchProject(
       }
 
       if (fs.existsSync(teamJsonCandidate)) {
-        const teamJsonContent = fs.readFileSync(teamJsonCandidate, "utf-8");
-        const teamJsonData = JSON.parse(teamJsonContent);
+        const teamJsonData = readJsonFile(teamJsonCandidate);
 
         let changed = false;
         if (teamJsonData.gatewayUrl !== accurateGatewayUrl) {

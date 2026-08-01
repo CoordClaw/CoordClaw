@@ -10,6 +10,7 @@ import os from "node:os";
 import path from "node:path";
 import { getCoordClawJsonPath } from "../shared/paths";
 import { writeJsonSafe } from "../shared/json-atomic";
+import { readCoordClawJson } from "../shared/config-store";
 import { debug, info, warn, getEventId } from "../shared/logger";
 
 const MODULE = "migrate";
@@ -39,8 +40,7 @@ export async function migrateCoordClawJson(): Promise<number> {
 
   let data: any;
   try {
-    const raw = fs.readFileSync(jsonPath, "utf-8");
-    data = JSON.parse(raw);
+    data = readCoordClawJson(jsonPath);
   } catch (err: any) {
     warn(MODULE, `[MIGRATE] coordclaw.json 读取失败，跳过: ${err.message}`, getEventId());
     return 0;

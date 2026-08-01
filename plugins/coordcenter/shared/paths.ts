@@ -327,6 +327,11 @@ export function getCoordClawJsonPath(): string {
   return path.join(getOpenClawUserDir(), "coordclaw.json");
 }
 
+/** 获取插件配置 config.json 的完整路径（位于 coordclaw 数据目录） */
+export function getConfigJsonPath(): string {
+  return path.join(getCoordClawDataDir(), "config.json");
+}
+
 export function getCoordClawLogsDir(): string {
   return path.join(getCoordClawDataDir(), "logs");
 }
@@ -358,7 +363,7 @@ export const DATABASE_FILENAME = "coordclaw.db";
  * @param projectRoot 项目根目录（由 resolveProjectRoot 返回）
  */
 export function getTeamJsonPath(projectRoot: string): string {
-  return path.join(projectRoot, TEAM_JSON_FILENAME);
+  return path.join(expandPath(projectRoot), TEAM_JSON_FILENAME);
 }
 
 /**
@@ -484,14 +489,8 @@ function getDeployLanguage(): string {
 
 // ==================== 项目管理路径（功能18：新建项目） ====================
 
-/**
- * 获取指定项目的 team.json 路径
- * @param projectRoot 项目根目录
- * 例: D:/projects/new-project/.data/team.json
- */
-export function getProjectTeamJsonPath(projectRoot: string): string {
-  return path.join(expandPath(projectRoot), ".data", "team.json");
-}
+// getProjectTeamJsonPath 已废弃：与 getTeamJsonPath(projectRoot) 等价
+// （前者仅多一次 expandPath，现已折入 getTeamJsonPath）。调用方改用 getTeamJsonPath。
 
 // ==================== Gateway 配置（env 优先，文件兜底） ====================
 

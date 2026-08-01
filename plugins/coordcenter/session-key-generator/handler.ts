@@ -12,6 +12,7 @@ import { loadTeamContext, TeamContext } from "../shared/team-loader";
 import { loadProjectTeamJson } from "../prompt-injection";
 import { callGatewayRpc } from "../shared/gateway-rpc";
 import { getTeamJsonPath } from "../shared/paths";
+import { writeJsonSafeOrThrow } from "../shared/json-atomic";
 import { syncTeamData } from "../shared/cache-coordinator";
 import { HttpRouteConfig } from "../shared/types-http";
 
@@ -271,8 +272,7 @@ export async function batchCreateSessionKeys(
   let writeFailed = false;
   if (updated > 0) {
     try {
-      const updatedContent = JSON.stringify(teamData, null, 2);
-      fs.writeFileSync(teamJsonPath, updatedContent, "utf-8");
+      writeJsonSafeOrThrow(teamJsonPath, teamData);
       info(caller, `[HTTP] ✅ team.json已更新`, eventId);
 
       // 增量同步运行时数据，不破坏正在运行 agent 的状态

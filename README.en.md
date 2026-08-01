@@ -49,6 +49,10 @@ To lower the barrier to team creation, it uses a skill-guided mode, letting newc
 
 Key note: because CoordClaw has the basic capability of strictly observing organizational discipline, team members will, based on the organizational relationships and rules, conduct thorough and comprehensive review and reporting — yet a trivial matter may be discussed at length. If you do not need such a detailed review-and-reporting collaboration flow and would rather grant more internal autonomy to the team, we recommend prioritizing adjustments to the project charter's process. You can also tune it through member traits and team rules.
 
+> Organization relationship diagram: the team structure is defined in natural language; one MD document is one team configuration.
+
+![Organization relationship](docs/readme_png/en/p1.png)
+
 ---
 
 ## Core Logic
@@ -75,6 +79,10 @@ Collaboration has only one atomic operation: **a message goes from A to B. It ar
 
 The basic mechanism of collaboration is the information loop, fundamentally different from deterministic loops like `for` or `while`. Information loops because of difference, until consensus is reached.
 
+> Message-loop interface: point-to-point messages travel back and forth between Agents; information loops because of difference until consensus is reached.
+
+![Message-loop interface](docs/readme_png/en/p2.png)
+
 ### Convergence and Consensus
 
 The information loop needs convergence to reach consensus and stop looping, completing the task. Convergence is the process; consensus is the loop-stop condition. Consensus is not the elimination of error, but different roles reaching agreement based on their own judgments. Consensus is not a binary right or wrong concept but a matter of degree — consensus quality level is the basis for judgment.
@@ -95,6 +103,10 @@ Sparse attention adds a heuristic layer on top of probability, namely what the m
 
 The context is fully reset every conversation round. Only the role definition and the structured work log are kept. **The work log is the project's memory.** Context contamination is like cancer — one hallucination spreads through the whole conversation chain. Resetting is not erasing memory; it is externalizing memory into auditable, persistent documents. This is the foundation for infinite-duration collaboration, intermittent collaboration, and preventing context contamination from destroying collaboration like cancer.
 
+> Agent structured work-log example: it carries context and is available for review; it is the carrier of the project's memory.
+
+![Agent structured work log](docs/readme_png/en/p7.png)
+
 ### SKILLs Configuration
 
 Skills can be toggled globally, configured per member, and any standard SKILL can be installed and configured on demand per task.
@@ -110,6 +122,20 @@ Skills can be toggled globally, configured per member, and any standard SKILL ca
 | **Preference Definer** | Make the choice when Agents cannot adjudicate |
 
 Humans have a God's-eye view — they can see all messages and intervene as any identity. Agents have a restricted view — they only receive unread messages addressed to themselves and cannot access others' conversations.
+
+---
+
+## Observability
+
+CoordClaw's "God's-eye view" is not just about watching messages; it is also about seeing the **cost and trajectory** of collaboration.
+
+- **Message-flow observation**: the control panel shows all Agent messages in real time (delivery, rejection, adjudication), and humans can intervene at any time (see "The Human Role").
+- **Token-consumption observation**: the control panel provides token-consumption charts. CoordClaw uses **local BPE estimation** (not relying on the `usage` returned by the API), providing observability fallback for the many models that do not return `usage` (gateway / relay / local / some OpenAI-compatible endpoints).
+
+Token-consumption charts are shown below:
+
+![Token consumption chart (1)](docs/readme_png/en/p5.png)
+![Token consumption chart (2)](docs/readme_png/en/p6.png)
 
 ---
 
@@ -203,6 +229,10 @@ Progress is pushed via SSE at the completion of each stage. The AI pauses betwee
 
 **These two files define the team's behavioral boundary.**
 
+> Team core config files (`team RULE.md` as the master config + `teamsoul.md` as the per-individual config) example:
+
+![Team core config: team RULE.md and teamsoul.md](docs/readme_png/en/p3.png)
+
 **5. Register and begin**
 After stage 5 completes, click "Register Team" → you can now create projects with your custom team for collaboration.
 
@@ -212,6 +242,12 @@ After stage 5 completes, click "Register Team" → you can now create projects w
 
 The coordination hub's runtime behavior is entirely driven by three config files under `.data/`. If you understand management science — organizational relations, role functions, delegation — you can customize collaborative behavior by directly editing these files.
 **Do not touch the section markers when editing.**
+
+CoordClaw's collaborative behavior is driven hierarchically by three types of files, with clear responsibility boundaries:
+
+- **Master config `team RULE.md`** — the collaboration skeleton (five standard actions T1 to T5, ten absolute prohibitions P1 to P10), defining "how the team does it"; it is the global behavioral boundary, and modifying any part may break the collaboration chain.
+- **Per-individual config `teamsoul.md`** — each Agent's identity file (role, hierarchy, personality), defining "who is what"; it affects only the individual.
+- **Runtime config `team.json`** — 25 adjustable parameters (task allocation, supervision mechanism, governance rules), defining "how fast it runs, how strictly it checks," grouped by management function.
 
 **Entry points**
 
@@ -247,6 +283,10 @@ The repo root already provides a `findplatforms.json.example` template; copy and
 | | `resetcontext.internal_plugin` | Whether to auto-reset after a session ends |
 
 Note: in `team.json`, besides prompt content, modify other parameters with caution. The current parameters are set for context reset and the mode where message review does not auto-mark as read.
+
+> Runtime config `team.json` example:
+
+![Team runtime config team.json](docs/readme_png/en/p4.png)
 
 **`team RULE.md` — collaboration skeleton (do not touch the core flow)**
 

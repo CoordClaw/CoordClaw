@@ -18,12 +18,13 @@ import path from "path";
 import { info, warn, error, getEventId } from "../shared/logger";
 import {
   getCoordClawJsonPath,
-  getProjectTeamJsonPath,
+  getTeamJsonPath,
   getCoordClawLogsDir,
   expandPath,
 } from "../shared/paths";
 import { fullReset } from "../shared/cache-coordinator";
 import { writeJsonSafe, writeJsonSafeOrThrow } from "../shared/json-atomic";
+import { readConfigRaw, readCoordClawJson, readTeamJson } from "../shared/config-store";
 import type {
   DeleteProjectRequest,
   ProjectDeleteResult,
@@ -129,9 +130,9 @@ export async function deleteProject(
   let originalCoordClawRaw: string | null = null;
 
   try {
-    const raw = fs.readFileSync(coordclawJsonPath, "utf-8");
+    const raw = readConfigRaw(coordclawJsonPath);
     originalCoordClawRaw = raw;
-    coordclawData = JSON.parse(raw);
+    coordclawData = readCoordClawJson();
     const teams = coordclawData.teams || [];
     teamRecord = teams.find((t: any) => t.id === teamId);
     if (!teamRecord) {
@@ -166,9 +167,9 @@ export async function deleteProject(
   // ====== Step 3: 读取项目 .data/team.json，提取 members ======
   let members: any[] = [];
   try {
-    const teamJsonPath = getProjectTeamJsonPath(projectPath);
+    const teamJsonPath = getTeamJsonPath(projectPath);
     if (fs.existsSync(teamJsonPath)) {
-      const teamJson = JSON.parse(fs.readFileSync(teamJsonPath, "utf-8"));
+      const teamJson = readTeamJson(projectPath);
       members = Array.isArray(teamJson.members) ? teamJson.members : [];
     } else {
       warn(

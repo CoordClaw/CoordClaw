@@ -22,14 +22,15 @@ import { info, warn, error, getEventId } from "../shared/logger";
 import {
   getCoordClawJsonPath,
   getTeamDir,
-  getProjectTeamJsonPath,
+  getTeamJsonPath,
   getOpenClawUserDir,
   resolveGatewayUrl,
   getCoordClawLogsDir,
   expandPath,
 } from "../shared/paths";
 import { fullReset } from "../shared/cache-coordinator";
-import { writeJsonSafe } from "../shared/json-atomic";
+import { writeJsonSafe, writeFileWithRetry } from "../shared/json-atomic";
+import { readConfigRaw, readCoordClawJson, readTeamJson } from "../shared/config-store";
 import type {
   CreateProjectRequest,
   ProjectCreateResult,
@@ -71,7 +72,7 @@ function writeProjectCreateLog(msg: string): void {
 function rollbackCoordClaw(coordclawJsonPath: string, originalRaw: string | null): void {
   if (!originalRaw) return;
   try {
-    fs.writeFileSync(coordclawJsonPath, originalRaw, "utf-8");
+    writeFileWithRetry(coordclawJsonPath, originalRaw);
   } catch (e: any) {
     warn("project-create", `[ROLLBACK] 恢复 coordclaw.json 失败: ${e?.message || String(e)}`, getEventId());
   }
@@ -201,9 +202,9 @@ export async function createProject(req: CreateProjectRequest): Promise<ProjectC
   let teamRecord: any;
   let originalCoordClawRaw: string | null = null;
   try {
-    const raw = fs.readFileSync(coordclawJsonPath, "utf-8");
+    const raw = readConfigRaw(coordclawJsonPath);
     originalCoordClawRaw = raw;
-    coordclawData = JSON.parse(raw);
+    coordclawData = readCoordClawJson();
     const teams = coordclawData.teams || [];
     teamRecord = teams.find((t: any) => t.id === teamId);
     if (!teamRecord) {
@@ -310,13 +311,13 @@ export async function createProject(req: CreateProjectRequest): Promise<ProjectC
   }
 
   // ====== Step 6: 从复制过来的 team.json 读取成员列表 ======
-  const teamJsonPath = getProjectTeamJsonPath(normalizedProjectPath);
+  const teamJsonPath = getTeamJsonPath(normalizedProjectPath);
   let teamJson: any;
   try {
     if (!fs.existsSync(teamJsonPath)) {
       throw new Error(`team.json 不存在: ${teamJsonPath}（请确保团队模板中包含 .data/team.json）`);
     }
-    teamJson = JSON.parse(fs.readFileSync(teamJsonPath, "utf-8"));
+    teamJson = readTeamJson(normalizedProjectPath);
     info(MODULE, `[Step6] 已加载 team.json: ${teamJsonPath}`, eventId);
   } catch (err: any) {
     const errMsg = `读取 team.json 失败: ${err.message}`;

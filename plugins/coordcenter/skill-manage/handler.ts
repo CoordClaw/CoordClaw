@@ -8,6 +8,8 @@
 import * as fs from "fs";
 import { debug, info, warn, getEventId } from "../shared/logger";
 import { getOpenClawJsonPath } from "../shared/paths";
+import { writeJsonSafe } from "../shared/json-atomic";
+import { readOpenClawJson } from "../shared/config-store";
 
 const MODULE = "skill-manage";
 
@@ -94,8 +96,7 @@ export async function setSkill(params: SkillSetParams): Promise<SkillSetResult> 
     if (!fs.existsSync(jsonPath)) {
       return { success: false, skillName, enabled, message: "openclaw.json not found" };
     }
-    const raw = fs.readFileSync(jsonPath, "utf-8");
-    const data = JSON.parse(raw);
+    const data = readOpenClawJson();
     data.agents = data.agents || { list: [] };
     data.agents.list = data.agents.list || [];
 
@@ -140,7 +141,7 @@ export async function setSkill(params: SkillSetParams): Promise<SkillSetResult> 
       }
     }
 
-    fs.writeFileSync(jsonPath, JSON.stringify(data, null, 2), "utf-8");
+    writeJsonSafe(jsonPath, data);
     return { success: true, skillName, enabled };
   } catch (err: any) {
     warn(MODULE, `[SET] failed: ${err.message}`, eventId);

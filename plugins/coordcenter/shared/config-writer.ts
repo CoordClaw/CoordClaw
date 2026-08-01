@@ -1,20 +1,30 @@
 import fs from "fs";
-import path from "path";
 import { info, error, getEventId } from "./logger";
-import { getOpenClawRoot, getOpenClawUserDir, getCoordClawDataDir, getCoordClawRoot, getTeamJsonPath, resolveGatewayUrl, resolveGatewayToken, getOpenClawFrameworkVersion } from "./paths";
+import {
+  getOpenClawRoot,
+  getOpenClawUserDir,
+  getCoordClawDataDir,
+  getCoordClawRoot,
+  getTeamJsonPath,
+  getCoordClawJsonPath,
+  getConfigJsonPath,
+  resolveGatewayUrl,
+  resolveGatewayToken,
+  getOpenClawFrameworkVersion,
+} from "./paths";
+import {
+  readOpenClawJson,
+  readTeamJson,
+  readCoordClawJson,
+  writeTeamJson,
+  writePluginConfig,
+} from "./config-store";
 import { ROUTE_REGISTRY } from "./routes";
 import { resolveProjectRoot } from "../prompt-injection";
 import { getConfig } from "../message-routing/internal-state";
-import { writeFileWithRetry } from "./json-atomic";
-
-const CONFIG_FILE = "config.json";
 
 function loadOpenClawJson(): any {
-  const userDir = getOpenClawUserDir();
-  if (!userDir) return null;
-  const configPath = path.join(userDir, "openclaw.json");
-  if (!fs.existsSync(configPath)) return null;
-  try { return JSON.parse(fs.readFileSync(configPath, "utf-8")); } catch { return null; }
+  try { return readOpenClawJson(); } catch { return null; }
 }
 
 function resolveWebchatUrl(): string {
@@ -55,8 +65,7 @@ async function updateTeamJsonWithAccurateValues(
       return;
     }
 
-    const rawContent = fs.readFileSync(teamJsonPath, "utf-8");
-    const teamData = JSON.parse(rawContent);
+    const teamData = readTeamJson(projectRoot);
 
     let updated = false;
 
@@ -79,7 +88,7 @@ async function updateTeamJsonWithAccurateValues(
     }
 
     if (updated) {
-      writeFileWithRetry(teamJsonPath, JSON.stringify(teamData, null, 2));
+      writeTeamJson(projectRoot, teamData);
       info("plugin", `[CONFIG] team.json 已更新: ${teamJsonPath}`, getEventId());
     } else {
       info("plugin", `[CONFIG] team.json 无需更新(值已准确)`, getEventId());
@@ -106,7 +115,7 @@ export async function writeConfigJson(api?: any): Promise<void> {
 
     info("plugin", `[CONFIG] 从OpenClaw获取准确配置: gatewayUrl=${accurateGatewayUrl}, webchatUrl=${accurateWebchatUrl}, openclawUserDir=${accurateUserDir}`, eventId);
 
-    const coordclawJsonPath = path.join(accurateUserDir, "coordclaw.json");
+    const coordclawJsonPath = getCoordClawJsonPath();
 
     // 归一化路径分隔符为正斜杠（JSON 中双斜杠 \\ 难以阅读且跨平台不兼容）
     const toConfigPath = (p: string | null) => (p || "").replace(/\\/g, "/");
@@ -115,7 +124,7 @@ export async function writeConfigJson(api?: any): Promise<void> {
     const endpointsEnabled = (() => {
       try {
         if (fs.existsSync(coordclawJsonPath)) {
-          const coordData = JSON.parse(fs.readFileSync(coordclawJsonPath, "utf-8"));
+          const coordData = readCoordClawJson(coordclawJsonPath);
           return coordData?.endpointslist === true;
         }
       } catch {}
@@ -147,8 +156,7 @@ export async function writeConfigJson(api?: any): Promise<void> {
       }));
     }
 
-    const configPath = path.join(dataDir, CONFIG_FILE);
-    writeFileWithRetry(configPath, JSON.stringify(config, null, 2));
+    writePluginConfig(config);
 
     if (coordClawRoot) {
       process.env.COORDCLAW_ROOT = coordClawRoot;
@@ -165,7 +173,7 @@ export async function writeConfigJson(api?: any): Promise<void> {
       }
     }
 
-    info("plugin", `[CONFIG] config.json 已生成: ${configPath}`, eventId);
+    info("plugin", `[CONFIG] config.json 已生成: ${getConfigJsonPath()}`, eventId);
 
     const cfg = getConfig();
     const projectRoot = await resolveProjectRoot(cfg.jsonPath, cfg.cacheTtl);

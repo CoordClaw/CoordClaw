@@ -26,7 +26,8 @@ import {
   removeFromAutoClawCompat,
   removeFromLobsterAIDB,
 } from "../shared/agent-artifacts";
-import { writeJsonSafe } from "../shared/json-atomic";
+import { writeJsonSafe, writeFileWithRetry } from "../shared/json-atomic";
+import { readConfigRaw, readCoordClawJson, readOpenClawJson, readTeamJsonByTeam } from "../shared/config-store";
 import type {
   DeleteTeamRequest,
   TeamDeleteResult,
@@ -84,9 +85,9 @@ export async function deleteTeam(
   let originalCoordClawRaw: string | null = null;
 
   try {
-    const raw = fs.readFileSync(coordclawJsonPath, "utf-8");
+    const raw = readConfigRaw(coordclawJsonPath);
     originalCoordClawRaw = raw;
-    coordclawData = JSON.parse(raw);
+    coordclawData = readCoordClawJson();
 
     const teams = coordclawData.teams || [];
     teamRecord = teams.find((t: any) => t.id === teamId);
@@ -118,7 +119,7 @@ export async function deleteTeam(
 
     const fromTeamJson: string[] = [];
     if (fs.existsSync(teamJsonPath)) {
-      const teamJson = JSON.parse(fs.readFileSync(teamJsonPath, "utf-8"));
+      const teamJson = readTeamJsonByTeam(teamId);
       const members = Array.isArray(teamJson.members) ? teamJson.members : [];
       for (const m of members) {
         const aid = m.agent_id || "";
@@ -163,9 +164,9 @@ export async function deleteTeam(
   let agentsRemoved = 0;
 
   try {
-    const raw = fs.readFileSync(openclawJsonPath, "utf-8");
+    const raw = readConfigRaw(openclawJsonPath);
     originalOpenclawRaw = raw;
-    openclawData = JSON.parse(raw);
+    openclawData = readOpenClawJson();
 
     const agentList = openclawData.agents?.list || [];
     const targetIds = new Set(memberAgentIds);
@@ -288,7 +289,7 @@ export async function deleteTeam(
     // 回滚 openclaw.json
     if (originalOpenclawRaw) {
       try {
-        fs.writeFileSync(openclawJsonPath, originalOpenclawRaw, "utf-8");
+        writeFileWithRetry(openclawJsonPath, originalOpenclawRaw);
         warn(MODULE, `[Step5] openclaw.json 已回滚`, eventId);
       } catch (rbErr: any) {
         error(MODULE, `[Step5] 回滚 openclaw.json 失败: ${rbErr.message}`, eventId);
@@ -336,7 +337,7 @@ export async function deleteTeam(
     writeTeamDeleteLog(`FAIL: ${errMsg}`);
     // openclaw.json 已写入了但 coordclaw.json 失败，回滚 openclaw.json
     if (originalOpenclawRaw) {
-      try { fs.writeFileSync(openclawJsonPath, originalOpenclawRaw, "utf-8"); } catch {}
+      try { writeFileWithRetry(openclawJsonPath, originalOpenclawRaw); } catch {}
       warn(MODULE, `[Step6b] openclaw.json 已回滚（coordclaw 写入失败）`, eventId);
     }
     return {

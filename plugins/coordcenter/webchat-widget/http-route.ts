@@ -35,8 +35,8 @@ function sendText(res: any, statusCode: number, contentType: string, body: strin
 /**
  * 处理 GET /webchat/config
  */
-function handleConfig(req: any, res: any) {
-  const config = getWidgetConfig();
+async function handleConfig(req: any, res: any) {
+  const config = await getWidgetConfig();
   sendJson(res, 200, config);
 }
 
@@ -65,7 +65,7 @@ export function registerWebchatWidgetRoutes(api: any): void {
       path: ROUTES.WIDGET_CONFIG,
       auth: "plugin",
       handler: async (req: any, res: any) => {
-        handleConfig(req, res);
+        await handleConfig(req, res);
       },
     },
     MODULE

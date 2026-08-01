@@ -40,6 +40,7 @@ import {
 } from "../shared/paths";
 import { isAutoClaw, findAutoClawSettingsPath, getLobsterAIDbPath } from "../shared/agent-artifacts";
 import { writeJsonSafe, writeJsonSafeOrThrow } from "../shared/json-atomic";
+import { readConfigRaw, readCoordClawJson, readOpenClawJson, readTeamJsonByTeam } from "../shared/config-store";
 import { parseTeamsoulFile, extractCommonSection, extractAgentPrivateSection } from "./soul-parser";
 import { parseTeamRuleFile, type RuleAgentInfo, type RuleHumanInfo, type RuleParseResult } from "../shared/rule-parser";
 import type {
@@ -140,8 +141,7 @@ async function phase1ValidateAndPrepare(
   }
 
   try {
-    const raw = fs.readFileSync(jsonPath, "utf-8");
-    const data = JSON.parse(raw);
+    const data = readCoordClawJson();
     const existingIds = (data.teams || []).map((t: any) => t.id);
     if (existingIds.includes(teamId)) {
       const errMsg = `teamId "${teamId}" 已存在于 coordclaw.json teams 列表中 (现有: ${existingIds.join(", ")})`;
@@ -419,8 +419,7 @@ async function phase2CreateAgents(
     if (!fs.existsSync(openclawJsonPath)) {
       throw new Error(`openclaw.json 不存在: ${openclawJsonPath}`);
     }
-    const raw = fs.readFileSync(openclawJsonPath, "utf-8");
-    const data = JSON.parse(raw);
+    const data = readOpenClawJson();
     const existingAgentIds = new Set((data.agents?.list || []).map((a: any) => a.id));
 
     const duplicates = agentIds.filter((id) => existingAgentIds.has(id));
@@ -467,7 +466,7 @@ async function phase2CreateAgents(
     const teamJsonPath = path.join(dataDir, "team.json");
     let teamJson: any = {};
     if (fs.existsSync(teamJsonPath)) {
-      teamJson = JSON.parse(fs.readFileSync(teamJsonPath, "utf-8"));
+      teamJson = readTeamJsonByTeam(teamId);
     }
 
     // 填入字段：team_name 使用注册名称，project_name 为空（团队阶段无项目概念）
@@ -599,9 +598,9 @@ async function phase2CreateAgents(
   let coordclawBackup: string | null = null;
   try {
     const jsonPath = getCoordClawJsonPath();
-    const raw = fs.readFileSync(jsonPath, "utf-8");
+    const raw = readConfigRaw(jsonPath);
     coordclawBackup = raw;
-    const data = JSON.parse(raw);
+    const data = readCoordClawJson();
 
     data.teams = data.teams || [];
     // Anchor templatePath to ~ if under home (P2a #20: cross-platform templatePath)
@@ -812,7 +811,7 @@ function syncAutoClawCompat(
     } else if (baseConfig) {
       d = JSON.parse(JSON.stringify(baseConfig));
     } else {
-      d = JSON.parse(fs.readFileSync(getOpenClawJsonPath(), "utf-8"));
+      d = readOpenClawJson();
     }
     d.agents = d.agents || { defaults: {}, list: [] };
     d.agents.list = d.agents.list || [];
@@ -841,7 +840,7 @@ function discoverMissingAgents(existingIds: Set<string>): Array<{
 
   const coordPath = getCoordClawJsonPath();
   if (!fs.existsSync(coordPath)) return result;
-  const coordData = JSON.parse(fs.readFileSync(coordPath, "utf-8"));
+  const coordData = readCoordClawJson();
   const teams = coordData.teams || [];
   if (teams.length === 0) return result;
 
@@ -910,7 +909,7 @@ export async function registerMissingAgents(): Promise<TeamRepairResult> {
   try {
     const cp = getCoordClawJsonPath();
     if (fs.existsSync(cp)) {
-      teamsCount = (JSON.parse(fs.readFileSync(cp, "utf-8")).teams || []).length;
+      teamsCount = (readCoordClawJson().teams || []).length;
     }
   } catch {}
 
@@ -990,7 +989,7 @@ export async function repairTeamAgents(teamIds?: string[]): Promise<TeamRepairRe
   if (!fs.existsSync(oc)) {
     return { success: false, teamsProcessed: 0, agentsMissing: 0, agentsRepaired: 0, agentsFailed: 0, details: [] };
   }
-  const ocData = JSON.parse(fs.readFileSync(oc, "utf-8"));
+  const ocData = readOpenClawJson();
   const existingIds = new Set<string>((ocData.agents?.list || []).map((a: any) => a.id));
 
   const missing = discoverMissingAgents(existingIds);

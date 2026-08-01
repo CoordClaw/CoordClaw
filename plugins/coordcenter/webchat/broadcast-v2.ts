@@ -5,13 +5,15 @@
  */
 
 import crypto from "node:crypto";
-import fsSync from "node:fs";
-import pathMod from "node:path";
-import osMod from "node:os";
 import netMod from "node:net";
 
 import { getRunLifecycleTracker } from "./run-lifecycle-tracker";
 import { resolveGatewayUrl, resolveGatewayToken } from "../shared/paths";
+import { debug, warn, error } from "../shared/logger";
+
+const d = (m: string) => debug('broadcast-v2', m);
+const w = (m: string) => warn('broadcast-v2', m);
+const e = (m: string) => error('broadcast-v2', m);
 
 const WEBSOCKET_GUID = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11";
 
@@ -39,20 +41,6 @@ let _gatewayToken: string | undefined;
 let _runtime: RuntimeType | undefined;
 let _enabled = false;
 
-const DEBUG_LOG_FILE = pathMod.join(osMod.homedir(), ".coordclaw-broadcast-debug.log");
-
-function rawLog(msg: string): void {
-  const line = `[${new Date().toISOString()}] ${msg}\n`;
-  try {
-    fsSync.appendFileSync(DEBUG_LOG_FILE, line, "utf8");
-  } catch (e) {
-    // 最后的手段：写到用户目录
-    try {
-      fsSync.appendFileSync(pathMod.join(osMod.homedir(), "coordclaw-debug.log"), line, "utf8");
-    } catch (e2) {}
-  }
-}
-
 function generateAcceptKey(clientKey: string): string {
   return crypto.createHash("sha1").update(clientKey + WEBSOCKET_GUID).digest("base64");
 }
@@ -64,7 +52,7 @@ const WS_PROTOCOL = 4;
 // 客户端→Gateway 的帧必须加掩码（RFC6455 要求浏览器/客户端发出的帧 masked）。
 function sendWsFrame(str: string): boolean {
   if (!gwSocket || gwSocket.destroyed) {
-    rawLog("sendWsFrame: ABORT - no socket");
+    d("sendWsFrame: ABORT - no socket");
     return false;
   }
   try {
@@ -91,7 +79,7 @@ function sendWsFrame(str: string): boolean {
     gwSocket.write(Buffer.concat([header, mask, masked]));
     return true;
   } catch (e: any) {
-    rawLog(`sendWsFrame error: ${e.message}`);
+    w(`sendWsFrame error: ${e.message}`);
     return false;
   }
 }
@@ -111,7 +99,7 @@ function sendConnectFrame(): void {
     },
   });
   const ok = sendWsFrame(frame);
-  rawLog(`sendConnectFrame: ${ok ? "sent" : "FAILED"}`);
+  d(`sendConnectFrame: ${ok ? "sent" : "FAILED"}`);
 }
 
 export function setRuntime(runtime: RuntimeType | undefined) {
@@ -124,12 +112,12 @@ export function setGatewayToken(token: string | undefined) {
 
 export function setEnabled(enabled: boolean) {
   _enabled = enabled;
-  rawLog(`setEnabled(${enabled})`);
+  d(`setEnabled(${enabled})`);
 }
 
 export function setTrackedSessionKeys(sessionKeys: string[]) {
   getRunLifecycleTracker().updateTrackedSessionKeys(sessionKeys);
-  rawLog(`setTrackedSessionKeys: ${sessionKeys.length} keys`);
+  d(`setTrackedSessionKeys: ${sessionKeys.length} keys`);
 }
 
 export function getBroadcastStatus() {
@@ -141,7 +129,7 @@ async function loadTokenFromRuntime(): Promise<string | undefined> {
   // 不再重复实现文件读取逻辑。
   const token = resolveGatewayToken();
   if (token) {
-    rawLog(`Token loaded via resolveGatewayToken (${token.length} chars)`);
+    d(`Token loaded via resolveGatewayToken (${token.length} chars)`);
     return token;
   }
 
@@ -151,43 +139,43 @@ async function loadTokenFromRuntime(): Promise<string | undefined> {
       const cfg = _runtime.config.loadConfig();
       const rtToken = cfg?.gateway?.auth?.token;
       if (rtToken) {
-        rawLog(`Token loaded from runtime.config (${rtToken.length} chars)`);
+        d(`Token loaded from runtime.config (${rtToken.length} chars)`);
         return rtToken;
       }
     }
   } catch (e) {
-    rawLog(`Token runtime load error: ${e instanceof Error ? e.message : String(e)}`);
+    w(`Token runtime load error: ${e instanceof Error ? e.message : String(e)}`);
   }
 
-  rawLog("Token NOT FOUND from any source");
+  w("Token NOT FOUND from any source");
   return undefined;
 }
 
 async function safeConnect(): Promise<boolean> {
   return new Promise((resolve) => {
     if (!_enabled) {
-      rawLog("safeConnect: ABORT - disabled");
+      d("safeConnect: ABORT - disabled");
       resolve(false);
       return;
     }
 
     if (gwConnected) {
-      rawLog("safeConnect: already connected");
+      d("safeConnect: already connected");
       resolve(true);
       return;
     }
 
-    rawLog("safeConnect: starting...");
+    d("safeConnect: starting...");
 
     let socket: any = null;
     let handshakeDone = false;
     const endpoint = resolveGatewayEndpoint();
-    rawLog(`safeConnect: target ${endpoint.host}:${endpoint.port}`);
+    d(`safeConnect: target ${endpoint.host}:${endpoint.port}`);
 
     const timeoutId = setTimeout(() => {
       if (!handshakeDone) {
         handshakeDone = true;
-        rawLog("safeConnect: TIMEOUT after 5s");
+        w("safeConnect: TIMEOUT after 5s");
         try { if (socket && !socket.destroyed) socket.destroy(); } catch (e) {}
         resolve(false);
       }
@@ -213,11 +201,11 @@ async function safeConnect(): Promise<boolean> {
 
           headers += "\r\n";
           socket.write(headers);
-          rawLog("safeConnect: handshake request sent");
+          d("safeConnect: handshake request sent");
         } catch (writeErr: any) {
           if (!handshakeDone) {
             handshakeDone = true;
-            rawLog(`safeConnect: write error: ${writeErr.message}`);
+            w(`safeConnect: write error: ${writeErr.message}`);
             clearTimeout(timeoutId);
             try { if (socket && !socket.destroyed) socket.destroy(); } catch (e) {}
             resolve(false);
@@ -228,7 +216,7 @@ async function safeConnect(): Promise<boolean> {
       socket.on("error", (err: Error) => {
         if (!handshakeDone) {
           handshakeDone = true;
-          rawLog(`safeConnect: socket error: ${err.message}`);
+          w(`safeConnect: socket error: ${err.message}`);
           clearTimeout(timeoutId);
           resolve(false);
         }
@@ -248,11 +236,11 @@ async function safeConnect(): Promise<boolean> {
             if (httpBuf.includes("101") && httpBuf.includes(generateAcceptKey(key))) {
               gwSocket = socket;
               gwConnected = true;
-              rawLog("safeConnect: ✅ HANDSHAKE SUCCESS (HTTP 101)");
+              d("safeConnect: ✅ HANDSHAKE SUCCESS (HTTP 101)");
 
               socket.removeAllListeners("data");
               socket.on("close", () => {
-                rawLog("safeConnect: connection closed by remote");
+                d("safeConnect: connection closed by remote");
                 gwConnected = false;
                 gwSocket = null;
                 scheduleReconnect();
@@ -261,7 +249,7 @@ async function safeConnect(): Promise<boolean> {
               resolve(true);
             } else {
               const m = httpBuf.match(/HTTP\/1\.1 (\d+)/);
-              rawLog(`safeConnect: ❌ HANDSHAKE FAILED HTTP ${m ? m[1] : "?"}`);
+              w(`safeConnect: ❌ HANDSHAKE FAILED HTTP ${m ? m[1] : "?"}`);
               try { socket.destroy(); } catch (e) {}
               resolve(false);
             }
@@ -269,7 +257,7 @@ async function safeConnect(): Promise<boolean> {
         } catch (dataErr: any) {
           if (!handshakeDone) {
             handshakeDone = true;
-            rawLog(`safeConnect: data parse error: ${dataErr.message}`);
+            w(`safeConnect: data parse error: ${dataErr.message}`);
             clearTimeout(timeoutId);
             try { if (socket && !socket.destroyed) socket.destroy(); } catch (e) {}
             resolve(false);
@@ -280,7 +268,7 @@ async function safeConnect(): Promise<boolean> {
       socket.on("close", () => {
         if (!handshakeDone) {
           handshakeDone = true;
-          rawLog("safeConnect: closed before handshake");
+          w("safeConnect: closed before handshake");
           clearTimeout(timeoutId);
           resolve(false);
         }
@@ -289,7 +277,7 @@ async function safeConnect(): Promise<boolean> {
     } catch (connectErr: any) {
       if (!handshakeDone) {
         handshakeDone = true;
-        rawLog(`safeConnect: connect exception: ${connectErr.message}`);
+        w(`safeConnect: connect exception: ${connectErr.message}`);
         clearTimeout(timeoutId);
         try { if (socket && !socket.destroyed) socket.destroy(); } catch (e) {}
         resolve(false);
@@ -300,13 +288,13 @@ async function safeConnect(): Promise<boolean> {
 
 export async function startBroadcastClientV2(): Promise<void> {
   try {
-    rawLog("========================================");
-    rawLog("=== startBroadcastClientV2() ENTRY ===");
-    rawLog(`_enabled=${_enabled}`);
-    rawLog(`_runtime=${!!_runtime}`);
+    d("========================================");
+    d("=== startBroadcastClientV2() ENTRY ===");
+    d(`_enabled=${_enabled}`);
+    d(`_runtime=${!!_runtime}`);
 
     if (!_enabled) {
-      rawLog("ABORT: feature disabled");
+      d("ABORT: feature disabled");
       return;
     }
 
@@ -314,35 +302,35 @@ export async function startBroadcastClientV2(): Promise<void> {
       _gatewayToken = await loadTokenFromRuntime();
     }
 
-    rawLog("calling safeConnect()...");
+    d("calling safeConnect()...");
     const success = await safeConnect();
 
     if (success) {
-      rawLog("✅ CONNECTED! starting frame listener...");
+      d("✅ CONNECTED! starting frame listener...");
       startFrameListener();
     } else {
-      rawLog("❌ connection failed");
+      w("❌ connection failed");
       scheduleReconnect();
     }
 
   } catch (err: any) {
-    rawLog(`UNEXPECTED ERROR: ${err.message}\n${err.stack || ""}`);
+    e(`UNEXPECTED ERROR: ${err.message}\n${err.stack || ""}`);
   }
 }
 
 function scheduleReconnect(): void {
   if (!_enabled) {
-    rawLog("scheduleReconnect: ABORT - disabled");
+    d("scheduleReconnect: ABORT - disabled");
     return;
   }
   if (_reconnectTimer) return;
-  rawLog(`scheduleReconnect: next attempt in ${_reconnectDelay}ms`);
+  d(`scheduleReconnect: next attempt in ${_reconnectDelay}ms`);
   _reconnectTimer = setTimeout(() => {
     _reconnectTimer = null;
     safeConnect().then((ok) => {
       if (ok) {
         _reconnectDelay = 1000;
-        rawLog("scheduleReconnect: ✅ reconnected, restarting frame listener");
+        d("scheduleReconnect: ✅ reconnected, restarting frame listener");
         startFrameListener();
       } else {
         _reconnectDelay = Math.min(_reconnectDelay * 2, RECONNECT_MAX_DELAY);
@@ -364,19 +352,19 @@ export function stopBroadcastClientV2() {
     }
     gwConnected = false;
     gwSocket = null;
-    rawLog("stopBroadcastClientV2: stopped");
+    d("stopBroadcastClientV2: stopped");
   } catch (err: any) {
-    rawLog(`stopBroadcastClientV2 error: ${err.message}`);
+    w(`stopBroadcastClientV2 error: ${err.message}`);
   }
 }
 
 function startFrameListener(): void {
   if (!gwSocket) {
-    rawLog("startFrameListener: ABORT - no socket");
+    d("startFrameListener: ABORT - no socket");
     return;
   }
 
-  rawLog("startFrameListener: started, waiting for data...");
+  d("startFrameListener: started, waiting for data...");
 
   let buffer = Buffer.alloc(0);
   let frameCount = 0;
@@ -404,7 +392,7 @@ function startFrameListener(): void {
           const high = buffer.readUInt32BE(2);
           const low = buffer.readUInt32BE(6);
           if (high > 0) {
-            rawLog(`frame: too large, skipping`);
+            w(`frame: too large, skipping`);
             buffer = Buffer.alloc(0);
             break;
           }
@@ -435,17 +423,17 @@ function startFrameListener(): void {
             let data: any = null;
             try { data = JSON.parse(payload.toString("utf8")); } catch { /* ignore */ }
             if (data && data.type === "event" && data.event === "connect.challenge") {
-              rawLog("frame: connect.challenge received → replying with connect auth");
+              d("frame: connect.challenge received → replying with connect auth");
               sendConnectFrame();
             } else {
               handleFrame(payload);
             }
             if (frameCount % 10 === 0) {
-              rawLog(`frame: received ${frameCount} frames total`);
+              d(`frame: received ${frameCount} frames total`);
             }
           }
         } else if (opcode === 0x8) {
-          rawLog("frame: received close frame");
+          d("frame: received close frame");
           return;
         } else if (opcode === 0x9) {
           if (gwSocket && !gwSocket.destroyed) {
@@ -455,7 +443,7 @@ function startFrameListener(): void {
         }
       }
     } catch (frameErr: any) {
-      rawLog(`frame processing error: ${frameErr.message}`);
+      w(`frame processing error: ${frameErr.message}`);
       buffer = Buffer.alloc(0);
     }
   });
@@ -485,6 +473,6 @@ function handleFrame(payload: Buffer): void {
       getRunLifecycleTracker().trackEvent(data);
     }
   } catch (handleErr: any) {
-    rawLog(`handleFrame error: ${handleErr.message}`);
+    w(`handleFrame error: ${handleErr.message}`);
   }
 }

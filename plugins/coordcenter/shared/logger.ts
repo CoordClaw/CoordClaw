@@ -40,7 +40,7 @@ const DEFAULT_CONFIG: GlobalLogConfig = {
     'rpc-client': { enable: true, level: LogLevel.DEBUG, writeToFile: true },
     'test-rpc': { enable: true, level: LogLevel.DEBUG, writeToFile: true },
     'workspace-reset': { enable: true, level: LogLevel.DEBUG, writeToFile: true },
-    'broadcast-v2': { enable: true, level: LogLevel.DEBUG, writeToFile: true },
+    'broadcast-v2': { enable: true, level: LogLevel.INFO, writeToFile: true },
     'run-tracker': { enable: true, level: LogLevel.DEBUG, writeToFile: true },
     'session-queue': { enable: true, level: LogLevel.DEBUG, writeToFile: true },
     'patch': { enable: true, level: LogLevel.DEBUG, writeToFile: true },

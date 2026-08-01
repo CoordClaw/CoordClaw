@@ -15,24 +15,21 @@ export function writeJsonAtomic(filePath: string, data: unknown): void {
  */
 export function writeJsonSafe(filePath: string, data: unknown): { ok: boolean; error?: string } {
   const content = JSON.stringify(data, null, 2);
-
-  // 策略1：原子写入（tmp + rename）
   try {
+    // 策略1：原子写入（tmp + rename），带 EPERM/EBUSY 退避重试
     const tmpPath = filePath + ".tmp";
-    fs.writeFileSync(tmpPath, content, "utf-8");
-    fs.renameSync(tmpPath, filePath);
-    return { ok: true };
-  } catch (renameErr: any) {
-    // Windows 上目标文件可能被占用，清理 .tmp
-    try { fs.unlinkSync(filePath + ".tmp"); } catch { /* best-effort */ }
-
-    // 策略2：直接覆盖写入
     try {
-      fs.writeFileSync(filePath, content, "utf-8");
+      writeFileWithRetry(tmpPath, content);
+      fs.renameSync(tmpPath, filePath);
       return { ok: true };
-    } catch (writeErr: any) {
-      return { ok: false, error: String(writeErr?.message || writeErr) };
+    } catch {
+      // Windows 上目标文件可能被占用，清理 .tmp 后回退直接覆盖写入
+      try { fs.unlinkSync(tmpPath); } catch { /* best-effort */ }
+      writeFileWithRetry(filePath, content);
+      return { ok: true };
     }
+  } catch (err: any) {
+    return { ok: false, error: String(err?.message || err) };
   }
 }
 

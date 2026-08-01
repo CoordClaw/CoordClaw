@@ -44,3 +44,6 @@ findplatforms.json
 # Generated static assets (built by scripts/copy-static.cjs; not authored source)
 controlpanel/web/static/js/i18n-dict.js
 controlpanel/web/static/js/lang-detect.js
+
+# Wiki content lives in the separate .wiki repo, not the main repo
+wiki-draft/
