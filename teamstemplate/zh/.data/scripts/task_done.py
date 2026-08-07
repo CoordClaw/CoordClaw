@@ -44,14 +44,17 @@ def utc_now_pair():
 def utc_iso_minus(minutes): return _utc(datetime.now(timezone.utc) - timedelta(minutes=minutes))
 
 # ── 功能开关：完成任务时自动标记未读消息为已读 ──
-# 设为 True 开启，设为 False 关闭
 MARK_READ_ON_DONE = True
-CLEANUP_TEMP=False
+CLEANUP_TEMP = False
 
 # ── 路径配置 ──
 SCRIPT_DIR = Path(__file__).resolve().parent
 TEAM_PATH = SCRIPT_DIR.parent / "team.json"
 DB_PATH = SCRIPT_DIR.parent / "data" / "coordclaw.db"
+TASK_DB_PATH = SCRIPT_DIR.parent / "data" / "task_progress.db"
+
+# ── 任务进度常量 ──
+T5_TASK = {"name": "T5", "description": "complete task", "progress": 100}
 
 # ── 集中字符串常量 ──
 MESSAGES = {
@@ -69,14 +72,12 @@ MESSAGES = {
     "MSG_TASK_DONE": "**终止会话**：你已经完成本次任务，马上停止思考，立即结束会话！",
     "MSG_MARK_READ_OK": "[OK] 已将 {reader} 的 {count} 条已查阅消息标记为已读",
     "MSG_MARK_READ_NONE": "[提示] {reader} 没有已查阅但未标记已读的消息（可能存在未读且未读且未查阅的消息）",
-    # ── 新增：全员未读检查相关 ──
     "WARN_CHECK_UNREAD": "[警告] 查询全员未读消息失败: {error}",
     "WARN_UPDATE_TEAM": "[警告] 修改 team.json 失败: {error}",
     "WARN_REFRESH_FAIL": "[警告] 发送缓存刷新信号失败: {error}",
     "WARN_REFRESH_STATUS": "[警告] 缓存刷新信号返回状态码: {status}",
     "OK_MSG_ROBOT_ENABLED": "[OK] 已启用 msg_robot（team.json 已更新）",
     "OK_CACHE_REFRESHED": "[OK] 缓存刷新信号已发送",
-    # ── 新增：temp 目录清理相关 ──
     "INFO_TEMP_CLEANUP": "[信息] temp 目录不存在，跳过清理: {path}",
     "INFO_TEMP_CLEANED": "[OK] 已清理 temp 目录: 删除 {count} 个过期项（超过 2 小时），请及时将有效文档移除temp目录，以免被清理！",
     "WARN_TEMP_CLEANUP": "[警告] 清理 temp 目录时出错: {error}",
@@ -92,10 +93,60 @@ def get_db():
     return conn
 
 
+# ── 任务进度记录（复用 chat_manager.py 模式）──
+
+def get_task_db():
+    TASK_DB_PATH.parent.mkdir(parents=True, exist_ok=True)
+    conn = sqlite3.connect(TASK_DB_PATH)
+    conn.row_factory = sqlite3.Row
+    conn.execute("PRAGMA busy_timeout=10000")
+    conn.execute("PRAGMA journal_mode=WAL")
+    _ensure_task_progress_table(conn)
+    return conn
+
+
+def _ensure_task_progress_table(conn):
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS task_progress (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            agent_id TEXT NOT NULL,
+            agent_name TEXT NOT NULL,
+            task_name TEXT NOT NULL,
+            task_description TEXT NOT NULL,
+            task_progress INTEGER NOT NULL,
+            recorded_at TEXT NOT NULL
+        )
+    """)
+    conn.execute("""
+        CREATE INDEX IF NOT EXISTS idx_task_progress_agent_recorded
+        ON task_progress(agent_id, recorded_at)
+    """)
+    conn.commit()
+
+
+def _record_task_progress(agent_id, agent_name, task_attr):
+    try:
+        conn = get_task_db()
+        try:
+            conn.execute(
+                """INSERT INTO task_progress 
+                   (agent_id, agent_name, task_name, task_description, task_progress, recorded_at)
+                   VALUES (?, ?, ?, ?, ?, ?)""",
+                (agent_id, agent_name, task_attr["name"], task_attr["description"],
+                 task_attr["progress"], utc_now_iso())
+            )
+            conn.commit()
+            print(f"[OK] 任务进度已记录: {task_attr['name']} ({agent_name}, progress={task_attr['progress']})")
+        finally:
+            conn.close()
+    except Exception as e:
+        print(f"[警告] 任务进度记录失败 ({task_attr['name']}): {e}")
+
+
 # ── 从 team.json 加载成员信息 ──
 
 def _load_team():
-    """加载 team.json，返回 (by_name_dict, team_dict, gateway_url)"""
+    """加载 team.json，返回 (by_name_dict, team_dict, gateway_url, reset_context)"""
     if TEAM_PATH.exists():
         try:
             with open(TEAM_PATH, "r", encoding="utf-8") as f:
@@ -110,9 +161,7 @@ def _load_team():
 
         gateway_url = team.get("gatewayUrl", "http://127.0.0.1:28789")
         gateway_url = gateway_url.rstrip("/")
-
         reset_context = team.get("resetcontext", "")
-
         return by_name, team, gateway_url, reset_context
     else:
         print(MESSAGES["ERR_TEAM_NOT_FOUND"].format(path=TEAM_PATH))
@@ -141,14 +190,12 @@ def mark_all_unread_as_read(reader_name, reader_id):
     conn = get_db()
     result = -1
     try:
-        # 检查 message_views 表是否存在
         table_check = conn.execute("""
             SELECT name FROM sqlite_master 
             WHERE type='table' AND name='message_views'
         """).fetchone()
 
         if table_check:
-            # 查询：未读 + 且有过 inbox 查阅记录
             q = """SELECT tm.msg_id FROM team_messages tm
                    LEFT JOIN team_message_reads tmr
                      ON tm.msg_id = tmr.msg_id AND tmr.reader_name = ?
@@ -182,7 +229,7 @@ def mark_all_unread_as_read(reader_name, reader_id):
     return result
 
 
-# ── 新增：查询全员是否有未读消息 ──
+# ── 查询全员是否有未读消息 ──
 
 def has_any_unread():
     """查询数据库是否存在任何未读消息（全团队维度）"""
@@ -204,21 +251,15 @@ def has_any_unread():
         conn.close()
 
 
-# ── 新增：检查条件并启用 msg_robot ──
+# ── 检查条件并启用 msg_robot ──
 
 def check_and_enable_msg_robot():
-    """
-    检查全员未读消息状态，条件满足时启用 msg_robot 并刷新缓存。
-    错误不影响后续逻辑，仅打印警告。
-    """
-    # 1. 检查全员是否有未读
+    """检查全员未读消息状态，条件满足时启用 msg_robot 并刷新缓存。"""
     if has_any_unread():
-        # 2. 检查 team.json 条件
         msg_robot = TEAM_CONFIG.get("msg_robot", False)
         auto_coordination = TEAM_CONFIG.get("auto_coordination", False)
 
         if not msg_robot and auto_coordination:
-            # 3. 修改 team.json
             try:
                 TEAM_CONFIG["msg_robot"] = True
                 with open(TEAM_PATH, "w", encoding="utf-8") as f:
@@ -228,7 +269,6 @@ def check_and_enable_msg_robot():
                 print(MESSAGES["WARN_UPDATE_TEAM"].format(error=e))
                 return
 
-            # 4. 发送缓存刷新信号
             try:
                 url = f"{GATEWAY_URL}/coordclaw-plugin/coordclawcenter/cache-refresh"
                 req = urllib.request.Request(
@@ -246,7 +286,7 @@ def check_and_enable_msg_robot():
                 print(MESSAGES["WARN_REFRESH_FAIL"].format(error=e))
 
 
-# ── 新增：工作日志记录读写 ──
+# ── 工作日志记录读写 ──
 
 def _load_record(worklog_dir):
     """读取 .record.jsonl，返回 {filename: mtime} 字典"""
@@ -284,7 +324,7 @@ def _append_record(worklog_dir, filename, mtime):
         pass
 
 
-# ── 新增：标题规范化与关键词提取 ──
+# ── 标题规范化与关键词提取 ──
 
 def _normalize_title(title):
     """消除数字、特殊符号、空格，只保留中文和英文字母"""
@@ -304,14 +344,9 @@ def _extract_keywords(text):
 
 
 def _normalize_and_split(title):
-    """
-    1. 消除空格
-    2. 用数字和特殊符号分割
-    3. 对每个中文片段提取2-4字关键词
-    """
+    """消除空格后用数字和特殊符号分割，对每个中文片段提取2-4字关键词"""
     no_space = title.replace(' ', '').replace('\u3000', '')
     parts = re.split(r'[0-9\W_]+', no_space)
-
     all_keywords = set()
     for part in parts:
         if len(part) >= 2:
@@ -319,26 +354,21 @@ def _normalize_and_split(title):
                 all_keywords.update(_extract_keywords(part))
             else:
                 all_keywords.add(part.lower())
-
     return all_keywords
 
 
 def _match_titles(template_title, file_title):
     """基于关键词匹配的标题模糊匹配"""
-    # 先检查子串包含关系
     t_norm = _normalize_title(template_title)
     f_norm = _normalize_title(file_title)
-
     if t_norm in f_norm or f_norm in t_norm:
         return True
     else:
         t_keywords = _normalize_and_split(template_title)
         f_keywords = _normalize_and_split(file_title)
-
         if not t_keywords:
             return True
         else:
-            # 检查模板关键词是否被文件覆盖
             matched = 0
             for t_kw in t_keywords:
                 if t_kw in f_norm:
@@ -348,50 +378,27 @@ def _match_titles(template_title, file_title):
                         if t_kw in f_kw or f_kw in t_kw:
                             matched += 1
                             break
-
             coverage = matched / len(t_keywords)
             return coverage >= 0.35
 
 
-# ── 新增：检查工作日志内容是否齐全 ──
+# ── 检查工作日志内容是否齐全 ──
 
 def check_worklog(name):
-    """
-    检查工作日志内容是否齐全。
-
-    1. 确保工作日志目录存在（不存在则静默创建）
-    2. 查找模板文件（工作日志-<name>-*.md 中修改时间最早的）
-       - 找不到模板 → 静默跳过检查
-    3. 读取 .record.jsonl，检查是否有新工作日志
-       - 最新文件已在记录中且 mtime 未更新 → 提示并退出
-    4. 提取模板中的 ## 标题作为标准
-    5. 查找最新工作日志（修改时间最新的 .md 文件）
-       - 如果只有模板文件 → 提示完成工作日志并退出
-    6. 检查最新文件是否包含所有标准标题
-       - 缺少 → 提示缺少内容并退出
-       - 齐全 → 写入 .record.jsonl 并返回 True
-    """
+    """检查工作日志内容是否齐全。"""
     worklog_dir = SCRIPT_DIR.parent.parent / "worklog" / name
-
-    # 1. 确保目录存在（静默创建）
     worklog_dir.mkdir(parents=True, exist_ok=True)
 
-    # 2. 查找模板文件：工作日志-<name>-*.md 中修改时间最早的
     md_files = list(worklog_dir.glob("worklog-*.md"))
-
     template_candidates = [
         f for f in md_files
         if f.name.startswith(f"worklog-{name}-") and f.name.endswith(".md")
     ]
 
     if template_candidates:
-        # 按修改时间取最早的作为模板
         template_file = min(template_candidates, key=lambda f: f.stat().st_mtime)
-
-        # 3. 读取历史记录
         records = _load_record(worklog_dir)
 
-        # 4. 提取模板中的标准标题
         template_content = None
         try:
             with open(template_file, "r", encoding="utf-8") as f:
@@ -400,22 +407,17 @@ def check_worklog(name):
             pass
 
         if template_content is not None:
-            # 提取所有 ## 开头的标题，保留原始标题用于模糊匹配
             standard_titles = []
             for line in template_content.splitlines():
                 if line.startswith("## "):
-                    raw_title = line[3:]
-                    standard_titles.append(raw_title)
+                    standard_titles.append(line[3:])
 
             if standard_titles:
-                # 5. 查找最新工作日志（修改时间最新的 .md 文件）
                 if len(md_files) > 1:
-                    # 排除模板文件，取最新的
                     other_files = [f for f in md_files if f != template_file]
                     latest_file = max(other_files, key=lambda f: f.stat().st_mtime)
                     latest_mtime = latest_file.stat().st_mtime
 
-                    # 检查是否已在记录中（跨平台时间戳比对）
                     is_new_record = True
                     if latest_file.name in records:
                         recorded_mtime = records[latest_file.name]
@@ -423,7 +425,6 @@ def check_worklog(name):
                             is_new_record = False
 
                     if is_new_record:
-                        # 6. 检查最新文件是否包含所有标准标题
                         latest_content = None
                         try:
                             with open(latest_file, "r", encoding="utf-8") as f:
@@ -432,14 +433,11 @@ def check_worklog(name):
                             pass
 
                         if latest_content is not None:
-                            # 提取最新文件中的标题，保留原始标题用于模糊匹配
                             latest_titles = []
                             for line in latest_content.splitlines():
                                 if line.startswith("## "):
-                                    raw_title = line[3:]
-                                    latest_titles.append(raw_title)
+                                    latest_titles.append(line[3:])
 
-                            # 检查缺少的标题（使用模糊匹配）
                             missing = []
                             for std_title in standard_titles:
                                 found = False
@@ -451,65 +449,37 @@ def check_worklog(name):
                                     missing.append(std_title)
 
                             if missing:
-                                # 按模板原样输出，不丢失数字、符号、空格
                                 missing_str = "、".join(missing)
                                 print(MESSAGES["ERR_WORKLOG_INCOMPLETE"].format(missing=missing_str, path=worklog_dir.as_posix(), template=template_file.name))
                                 sys.exit(1)
                             else:
-                                # 验证通过，写入记录
                                 _append_record(worklog_dir, latest_file.name, latest_mtime)
                     else:
-                        # 最新文件已被记录过，说明本轮没有写新日志
                         print(MESSAGES["ERR_WORKLOG_NO_RECORD"].format(path=worklog_dir.as_posix(), template=template_file.name))
                         sys.exit(1)
                 else:
-                    # 只有模板文件，没有其他工作日志
                     print(MESSAGES["ERR_WORKLOG_NO_RECORD"].format(path=worklog_dir.as_posix(), template=template_file.name))
                     sys.exit(1)
-    # 找不到模板 → 静默跳过（函数自然返回 True）
     return True
 
 
-# ── 新增：清理 temp 目录 ──
+# ── 清理 temp 目录 ──
 
 def cleanup_temp_dir():
-    """
-    清理与 worklog 目录同级的 temp 目录下超过 2 小时的文件和目录。
-
-    目录结构示例：
-        project/
-        ├── worklog/
-        │   └── <name>/
-        ├── temp/          ← 要清理的目标
-        └── .DATA/
-
-    1. 定位 temp 目录
-    2. 如果 temp 目录不存在 → 静默跳过
-    3. 遍历 temp 目录下的所有文件和子目录
-    4. 检查每个项目的最后修改时间（st_mtime）
-    5. 如果超过 2 小时（7200 秒）→ 删除（文件用 os.remove，目录用 shutil.rmtree）
-    6. 打印清理结果
-
-    跨平台兼容：使用 pathlib + os/shutil，不依赖 shell 命令。
-    """
+    """清理与 worklog 目录同级的 temp 目录下超过 2 小时的文件和目录。"""
     temp_dir = SCRIPT_DIR.parent.parent / "temp"
-
     if not temp_dir.exists():
         print(MESSAGES["INFO_TEMP_CLEANUP"].format(path=temp_dir.as_posix()))
         return
-
     if not temp_dir.is_dir():
         print(MESSAGES["WARN_TEMP_CLEANUP"].format(error=f"{temp_dir.as_posix()} 不是目录"))
         return
 
-    cutoff = datetime.now(timezone.utc).timestamp() - 7200  # 2 小时前的时间戳
+    cutoff = datetime.now(timezone.utc).timestamp() - 7200
     deleted_count = 0
-
     try:
-        # 使用 os.scandir 遍历，比 listdir 更高效
         for entry in os.scandir(temp_dir):
             try:
-                # 获取修改时间（跨平台统一使用 st_mtime）
                 mtime = entry.stat().st_mtime
                 if mtime < cutoff:
                     if entry.is_file(follow_symlinks=False):
@@ -519,9 +489,7 @@ def cleanup_temp_dir():
                         shutil.rmtree(entry.path)
                         deleted_count += 1
             except OSError:
-                # 跳过当前项的权限错误或其他问题，继续处理其他项
                 continue
-
         if deleted_count > 0:
             print(MESSAGES["INFO_TEMP_CLEANED"].format(count=deleted_count))
     except Exception as e:
@@ -533,17 +501,13 @@ def cleanup_temp_dir():
 def send_abort_signal(session_key):
     """发送 abort 信号到 session-abort-debug 接口"""
     url = f"{GATEWAY_URL}/coordclaw-plugin/coordclawcenter/session-abort-debug"
-    payload = json.dumps({
-        "sessionKey": session_key
-    }, ensure_ascii=False).encode("utf-8")
-
+    payload = json.dumps({"sessionKey": session_key}, ensure_ascii=False).encode("utf-8")
     req = urllib.request.Request(
         url,
         data=payload,
         headers={"Content-Type": "application/json"},
         method="POST"
     )
-
     try:
         with urllib.request.urlopen(req, timeout=10) as resp:
             return resp.status == 200
@@ -560,17 +524,13 @@ def send_abort_signal(session_key):
 def send_reset_signal(session_key):
     """发送 reset 信号到 session-reset 接口"""
     url = f"{GATEWAY_URL}/coordclaw-plugin/coordclawcenter/session-reset"
-    payload = json.dumps({
-        "sessionKey": session_key
-    }, ensure_ascii=False).encode("utf-8")
-
+    payload = json.dumps({"sessionKey": session_key}, ensure_ascii=False).encode("utf-8")
     req = urllib.request.Request(
         url,
         data=payload,
         headers={"Content-Type": "application/json"},
         method="POST"
     )
-
     try:
         with urllib.request.urlopen(req, timeout=10) as resp:
             return resp.status == 200
@@ -595,38 +555,32 @@ def main():
     p.add_argument("--name", required=True, help="智能体自己的名字（需与 team.json 中的 name 一致）")
     args = p.parse_args()
 
-    # 校验成员
     name = validate_member(args.name)
     member = TEAM_BY_NAME[name]
     agent_id = member.get("agent_id", "")
     session_key = member.get("sessionKey", "")
     resetcontext = RESET_CONTEXT.get("external_tools", "")
 
-    # 校验 sessionKey
     if session_key:
-        # ── 新增：清理与 worklog 同级的 temp 目录 ──
         if CLEANUP_TEMP:
             cleanup_temp_dir()
 
-        # ── 检查工作日志内容是否齐全 ──
+        # 先检查工作日志，通过后才记录 T5
         check_worklog(name)
 
+        # 工作日志检查通过，记录 T5 任务进度
+        _record_task_progress(agent_id, name, T5_TASK)
 
-        # ── 自动标记已读（由 MARK_READ_ON_DONE 控制）──
         if MARK_READ_ON_DONE:
             count = mark_all_unread_as_read(name, agent_id)
             if count > 0:
                 print(MESSAGES["MSG_MARK_READ_OK"].format(reader=name, count=count))
             elif count == 0:
                 print(MESSAGES["MSG_MARK_READ_NONE"].format(reader=name))
-            # count == -1 表示出错，已在函数内打印错误信息
 
-        # ── 检查全员未读并启用 msg_robot（在 abort 之前）──
         check_and_enable_msg_robot()
 
-        # 发送 abort 信号
         success = send_abort_signal(session_key)
-
         if success:
             print(MESSAGES["MSG_TASK_DONE"])
             if resetcontext:

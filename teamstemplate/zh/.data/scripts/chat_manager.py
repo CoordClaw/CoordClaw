@@ -39,9 +39,12 @@ def utc_now_pair():
     return _utc(dt), dt.astimezone().strftime("%Y-%m-%d")
 def utc_iso_minus(minutes): return _utc(datetime.now(timezone.utc) - timedelta(minutes=minutes))
 
-DB_PATH = Path(__file__).resolve().parent.parent / "data" / "coordclaw.db"
-TEAM_PATH = Path(__file__).resolve().parent.parent / "team.json"
-RULE_PATH = Path(__file__).resolve().parent.parent / "team RULE.md"
+SCRIPT_DIR = Path(__file__).resolve().parent
+DB_PATH = SCRIPT_DIR.parent / "data" / "coordclaw.db"
+TEAM_PATH = SCRIPT_DIR.parent / "team.json"
+RULE_PATH = SCRIPT_DIR.parent / "team RULE.md"
+TASK_DB_PATH = SCRIPT_DIR.parent / "data" / "task_progress.db"
+ABORT_LOG_PATH = SCRIPT_DIR / "abort_log.txt"
 
 MARK_READ_ON_DONE = False
 # ── 消息长度限制 ──
@@ -50,6 +53,19 @@ MAX_MESSAGE_LENGTH = 700       # 所有消息的最长长度（字）
 
 # ── 状态标志标签（大小写敏感，可扩展数组）──
 STATUS_TAGS = ["[STATUS]"]
+
+T1_TASK = {
+    "name":"T1",
+    "description":"get unread messages",
+    "progress":20
+}
+
+T4_TASK = {
+    "name":"T4",
+    "description":"send messages",
+    "progress":80
+}
+
 
 # ── 脚本获取提示词并连同工具返回值一同返回给LLM──
 LLM_PROMPT_INBOX = ["x-messagerule"]
@@ -128,9 +144,7 @@ MESSAGES = {
 """,
 }
 
-# ── 防反复调用机制：日志文件路径保留（仅 abort_log.txt）──
-SCRIPT_DIR = Path(__file__).resolve().parent
-ABORT_LOG_PATH = SCRIPT_DIR / "abort_log.txt"
+
 
 
 # ── 从 team.json（唯一权威源）加载成员信息 ──
@@ -234,6 +248,76 @@ def get_db():
     _ensure_core_tables(conn)
     return conn
 
+# ── 任务进度记录 ──
+
+def get_task_db():
+    TASK_DB_PATH.parent.mkdir(parents=True, exist_ok=True)
+    conn = sqlite3.connect(TASK_DB_PATH)
+    conn.row_factory = sqlite3.Row
+    conn.execute("PRAGMA busy_timeout=10000")
+    conn.execute("PRAGMA journal_mode=WAL")
+    _ensure_task_progress_table(conn)
+    return conn
+
+
+def _ensure_task_progress_table(conn):
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS task_progress (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            agent_id TEXT NOT NULL,
+            agent_name TEXT NOT NULL,
+            task_name TEXT NOT NULL,
+            task_description TEXT NOT NULL,
+            task_progress INTEGER NOT NULL,
+            recorded_at TEXT NOT NULL
+        )
+    """)
+    conn.execute("""
+        CREATE INDEX IF NOT EXISTS idx_task_progress_agent_recorded
+        ON task_progress(agent_id, recorded_at)
+    """)
+    conn.commit()
+
+
+def _record_task_progress(agent_id, agent_name, task_attr):
+    try:
+        conn = get_task_db()
+        try:
+            conn.execute(
+                """INSERT INTO task_progress 
+                   (agent_id, agent_name, task_name, task_description, task_progress, recorded_at)
+                   VALUES (?, ?, ?, ?, ?, ?)""",
+                (agent_id, agent_name, task_attr["name"], task_attr["description"],
+                 task_attr["progress"], utc_now_iso())
+            )
+            conn.commit()
+            print(f"[OK] 任务进度已记录: {task_attr['name']} ({agent_name}, progress={task_attr['progress']})")
+        finally:
+            conn.close()
+    except Exception as e:
+        print(f"[警告] 任务进度记录失败 ({task_attr['name']}): {e}")
+
+
+def _clear_agent_tasks_if_round_complete(agent_id):
+    try:
+        conn = get_task_db()
+        try:
+            row = conn.execute(
+                "SELECT 1 FROM task_progress WHERE agent_id = ? AND task_progress >= 100 LIMIT 1",
+                (agent_id,)
+            ).fetchone()
+            if row:
+                conn.execute("DELETE FROM task_progress WHERE agent_id = ?", (agent_id,))
+                conn.commit()
+                print(f"[OK] 已清理 {agent_id} 的旧轮次任务记录")
+                return True
+        finally:
+            conn.close()
+    except Exception as e:
+        print(f"[警告] 清理旧轮次记录失败 ({agent_id}): {e}")
+    return False
+
+
 
 def normalize_name(name):
     return name.lstrip("@") if name else name
@@ -322,6 +406,8 @@ def cmd_send(args):
             timestamp=now, sender=sender_name, sender_id=sender_id,
             recipient=recipient_name, recipient_id=recipient_id
         ))
+        # 记录 T4 任务进度
+        _record_task_progress(sender_id, sender_name, T4_TASK)
         print(MESSAGES["SEND_REMINDER_RECIPIENT"])
     except Exception as e:
         print(MESSAGES["SEND_ERR_FAIL"].format(error=e))
@@ -781,6 +867,11 @@ def cmd_inbox(args):
             conn.close()
 
     has_msgs = print_msgs(msgs, f"{reader_name}的收件箱", viewer_name=reader_name)
+
+    if has_msgs:
+        # ── 有消息：清理旧轮次记录并记录 T1 任务进度 ──
+        _clear_agent_tasks_if_round_complete(reader_id)
+        _record_task_progress(reader_id, reader_name, T1_TASK)
 
     if not has_msgs:
         # ── 空收件箱：防反复调用机制（数据库版）──
