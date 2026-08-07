@@ -17,6 +17,7 @@ import {
 } from "../prompt-injection";
 import { getConfig, incrementMsgReminderCount } from "./internal-state";
 import { getSessionRecordBySessionKey } from "./cache/manager";
+import { setStatusAndTime } from './transition';
 
 export function getMemberByAgentId(members: any[], agentId: string) {
   return members.find((m: any) => m.agent_id === agentId);
@@ -49,22 +50,20 @@ export async function loadTeamData() {
   return _cachedLoadTeamResult;
 }
 
-export function sortByT7Priority(members: any[], memberStates: Map<string, any>) {
-  return [...members].sort((a, b) => {
-    const aHasT7 = memberStates.get(a.agent_id)?.state === AgentLifecycleState.NEEDS_GROUPCHAT_FEEDBACK;
-    const bHasT7 = memberStates.get(b.agent_id)?.state === AgentLifecycleState.NEEDS_GROUPCHAT_FEEDBACK;
-    if (aHasT7 && !bHasT7) return -1;
-    if (!aHasT7 && bHasT7) return 1;
-    return 0;
-  });
-}
-
 export type DispatchActionType = 'msg1' | 'msg2' | 't7' | 'msg5' | 'skip';
 
 export function buildDispatchAction(
   ctxObj: AgentDispatchContext,
   teamTaskCompleted: boolean
 ): { type: DispatchActionType; label: string } {
+  // 预留机制: abort 通知(msg5) —— 仅被 abort 的 trigger 自身处理, 避免旁观 pass 混入他人 abort 导致重复/错上下文。
+  if (ctxObj.aborted && ctxObj.isTrigger) {
+    if (!isCheckEnabled(ctxObj.teamData, 'checkdeadlockstatus')) {
+      return { type: 'skip', label: '跳过(checkdeadlockstatus已关闭)' };
+    }
+    return { type: 'msg5', label: '发送msg5(abort通知)' };
+  }
+
   const { state, isPM, teamHasUnread } = ctxObj;
   const hasUnread = teamHasUnread ?? false;
 
@@ -112,11 +111,9 @@ export function markTargetProcessing(sessionKey: string): void {
     error("message-routing", "markTargetProcessing: session record not found for sessionKey: " + sessionKey);
     return;
   }
-  const now = new Date().toISOString();
-  targetRecord.status = 'processing';
+  setStatusAndTime(targetRecord, 'processing');
   targetRecord.fixable = false;
-  targetRecord.startedAt = targetRecord.startedAt || now;
-  targetRecord.updatedAt = now;
+  targetRecord.updatedAt = new Date().toISOString();
 
   writeSnapshotFile(sessionKey);
 }

@@ -22,11 +22,9 @@ import {
   isMember,
   isPM,
   loadTeamData,
-  sortByT7Priority,
   buildDispatchAction,
   markTargetProcessing,
   executeDispatchAction,
-  DispatchActionType,
 } from "./dispatch";
 import { writeSnapshotFile } from "../session-snapshot/persistence";
 import {
@@ -38,6 +36,7 @@ import {
 import { calculateTriggerState, calculateOtherMemberState } from "./state/calculator";
 import { getRecentReadRecords, resetReadStatusForAgent } from "./database/manager";
 import { getSessionQueueTracker } from "./session-queue-tracker";
+import { setStatusAndTime } from './transition';
 
 function getEarliestUnreadAt(receivedUnreadMessages: { created_at: string }[]): string | null {
   if (!receivedUnreadMessages || receivedUnreadMessages.length === 0) return null;
@@ -73,12 +72,7 @@ export async function transitionToProcessing(sessionKey: string, agentId: string
   const cached = await ensureCacheEntry(agentId, sessionKey);
   if (!cached) return;
 
-  if (cached.status === 'processing') {
-    debug('message-routing', `[SESSION] ${cached.agentName}(${cached.agentId}) | 已在processing中，跳过 (source=${source}${runId ? ` runId=${runId}` : ''}) | ${sessionKey}`, getEventId());
-    return;
-  }
-
-  await updateStatus(sessionKey, 'processing', source, false);
+  await updateStatus(sessionKey, 'processing', source);
 }
 
 export async function transitionToEnded(sessionKey: string, agentId: string, source: string, runId?: string, endedAt?: number) {
@@ -93,33 +87,24 @@ export async function transitionToEnded(sessionKey: string, agentId: string, sou
   );
   if (!member) return;
 
-  await updateStatus(sessionKey, 'ended', source, false, endedAt);
+  await updateStatus(sessionKey, 'ended', source, endedAt);
   clearSignals(sessionKey);
 }
 
 // ==================== updateStatus ====================
-async function updateStatus(sessionKey: string, status: string, source: string, force = false, endedAt?: number): Promise<boolean> {
+async function updateStatus(sessionKey: string, status: string, source: string, endedAt?: number): Promise<boolean> {
   const cached = sessionActivityCache.get(sessionKey);
   if (!cached) return false;
-
-  if (!force && cached.status === status) {
-    debug('message-routing', `[SESSION] ${cached.agentName}(${cached.agentId}) | 状态无变化, 跳过 (source=${source}) | ${sessionKey}`, getEventId());
-    return false;
-  }
 
   const oldStatus = cached.status;
   info('message-routing', `[SESSION] ${cached.agentName}(${cached.agentId}) | status ${oldStatus || 'null'} → ${status} (source=${source}) | ${sessionKey}`, getEventId());
 
+  setStatusAndTime(cached, status, endedAt);
   if (status === 'processing') {
-    cached.status = 'processing';
     cached.state = AgentLifecycleState.RUNNING;
-    cached.startedAt = new Date().toISOString();
-    cached.endedAt = null;
-  } else {
-    cached.status = 'ended';
-    cached.endedAt = endedAt ? new Date(endedAt).toISOString() : new Date().toISOString();
   }
   cached.updatedAt = new Date().toISOString();
+  writeSnapshotFile(sessionKey);
 
   if (oldStatus === 'processing' && status === 'ended' && source !== 'llm_error') {
     try {
@@ -257,7 +242,6 @@ export async function executeMessageRouting(sessionKey: string, source: string) 
       }
     }
 
-    const sortedMembers = sortByT7Priority(members, memberStates);
     let maxActivations = parseNumberConfig(teamData.max_activations, 2);
 
     const teamHasUnread = [...memberStates.values()].some(ms =>
@@ -298,9 +282,27 @@ export async function executeMessageRouting(sessionKey: string, source: string) 
       mState: any;
       firstUnreadAt: string | null;
     }
+    // 解耦核心: 列表分桶拼接 + 仅 msg1 桶内排序。skip 直接丢弃, 永不进排序(消除非传递比较器污染 msg1 顺序)。
+    function compareFirstUnreadAt(a: PendingDispatch, b: PendingDispatch): number {
+      const fa = a.firstUnreadAt, fb = b.firstUnreadAt;
+      if (fa && fb) return fa.localeCompare(fb); // 最早未读(滞留最久)排前
+      if (fa) return -1;                          // null 置最末, 保传递性
+      if (fb) return 1;
+      return 0;
+    }
+    function buildDispatchQueue(list: PendingDispatch[]): PendingDispatch[] {
+      const buckets: Record<string, PendingDispatch[]> = { msg5: [], t7: [], msg2: [], msg1: [] };
+      for (const e of list) {
+        if (e.actionType === 'skip') continue;            // skip 直接丢弃
+        (buckets[e.actionType] ?? buckets.msg1).push(e);  // msg5/t7/msg2 各≤1, 占位无需排序
+      }
+      buckets.msg1.sort(compareFirstUnreadAt);             // 唯一真实排序, 隔离纯函数
+      return [...buckets.msg5, ...buckets.t7, ...buckets.msg2, ...buckets.msg1];
+    }
+
     const pendingList: PendingDispatch[] = [];
 
-    for (const m of sortedMembers) {
+    for (const m of members) {
       const mAgentId = m.agent_id;
       const mState = memberStates.get(mAgentId);
       if (!mState) continue;
@@ -319,10 +321,19 @@ export async function executeMessageRouting(sessionKey: string, source: string) 
         logger: console,
         chainId,
         isTrigger,
+        aborted: mState.aborted,
         projectRoot,
       };
 
       const action = buildDispatchAction(ctxObj, getTeamTaskCompleted());
+
+      // 预留机制(msg5): 若 abort 被判定为抑制(返回 skip 而非 msg5, 通常 checkdeadlockstatus 关闭),
+      // 在此消费(aborted)标志, 避免该 agent 在后续路由 pass 中反复触发。
+      // (msg5 真正派发时的标志清除在 Phase2 派发点执行, 避免 CAS 跳过导致"清了却没发"。)
+      if (ctxObj.aborted && ctxObj.isTrigger && action.type === 'skip') {
+        const rec = getSessionRecordBySessionKey(mState.sessionKey);
+        if (rec) rec.aborted = false;
+      }
 
       info('message-routing', `[ROUTING] [${chainId}] [DISPATCH-DETAIL] ${mState.agentName}(${mAgentId}) isPM=${ctxObj.isPM} isTrigger=${isTrigger} teamHasUnread=${teamHasUnread} state=${mState.state}`, getEventId());
       info('message-routing', `[ROUTING] [${chainId}] [DISPATCH] ${mState.agentName}(${mAgentId})${ctxObj.isPM ? '(PM)' : ''} → ${mState.state} → ${action.label}`, getEventId());
@@ -348,68 +359,11 @@ export async function executeMessageRouting(sessionKey: string, source: string) 
       }
     }
 
-    for (const m of members) {
-      const mAgentId = m.agent_id;
-      const mState = memberStates.get(mAgentId);
-      if (!mState || !mState.aborted) continue;
+    // msg5(abort 通知) 已并入 buildDispatchAction 统一判定(仅被 abort 的 trigger 自处理),
+    // 不再在此独立循环 scoop 他人 abort。详见 dispatch.ts buildDispatchAction 顶部分支。
 
-      if (!isCheckEnabled(teamData, 'checkdeadlockstatus')) {
-        info('message-routing', `[ROUTING] [${chainId}] ABORT-SKIP | ${mState.agentName}(${mAgentId}) aborted=true but checkdeadlockstatus disabled`, getEventId());
-        const record = getSessionRecordBySessionKey(mState.sessionKey);
-        if (record) record.aborted = false;
-        continue;
-      }
-
-      const ctxObj: AgentDispatchContext = {
-        agentId: mAgentId,
-        agentName: mState.agentName,
-        sessionKey: mState.sessionKey,
-        state: mState.state,
-        isPM: isPM(members, mAgentId),
-        pmSessionKey: members[0]?.sessionKey,
-        teamHasUnread,
-        members,
-        teamData,
-        logger: console,
-        chainId,
-        isTrigger: mAgentId === agentId,
-        projectRoot,
-        aborted: true,
-      };
-
-      pendingList.unshift({
-        ctxObj,
-        actionType: 'msg5' as DispatchActionType,
-        actionLabel: '发送msg5(abort通知)',
-        isPM: ctxObj.isPM,
-        isTrigger: ctxObj.isTrigger,
-        agentName: mState.agentName,
-        agentId: mAgentId,
-        mState,
-        firstUnreadAt: null,
-      });
-
-      const record = getSessionRecordBySessionKey(mState.sessionKey);
-      if (record) record.aborted = false;
-      info('message-routing', `[ROUTING] [${chainId}] ABORT-QUEUE | ${mState.agentName}(${mAgentId}) aborted=true → msg5 已插入队列，标记已重置`, getEventId());
-    }
-
-    pendingList.sort((a, b) => {
-      if (a.actionType === 'msg5' && b.actionType !== 'msg5') return -1;
-      if (a.actionType !== 'msg5' && b.actionType === 'msg5') return 1;
-      if (a.actionType === 't7' && b.actionType !== 't7') return -1;
-      if (a.actionType !== 't7' && b.actionType === 't7') return 1;
-      if (a.actionType === 'msg2' && b.actionType === 'msg1') return -1;
-      if (a.actionType === 'msg1' && b.actionType === 'msg2') return 1;
-      if (a.actionType === 'msg1' && b.actionType === 'msg1') {
-        if (a.firstUnreadAt && b.firstUnreadAt) {
-          return a.firstUnreadAt.localeCompare(b.firstUnreadAt);
-        }
-        if (a.firstUnreadAt) return -1;
-        if (b.firstUnreadAt) return 1;
-      }
-      return 0;
-    });
+    // 解耦: 分桶拼接 + 仅 msg1 内排序。skip 直接丢弃, 绝不进排序(消除非传递比较器污染)。
+    const dispatchQueue = buildDispatchQueue(pendingList);
 
     info('message-routing', `[ROUTING] [${chainId}] ===== Phase 2: 乐观标记 (最多 ${maxActivations}) =====`, getEventId());
 
@@ -428,11 +382,7 @@ export async function executeMessageRouting(sessionKey: string, source: string) 
     let markCount = 0;
     let triggerSelfTargeted = false;
     let hasBlockedCandidate = false;
-    for (const item of pendingList) {
-      if (item.actionType === 'skip') {
-        info('message-routing', `[ROUTING] [${chainId}] MARK-SKIP | ${item.agentName}(${item.agentId}) 状态=${item.mState.state} 决策=${item.actionLabel}`, getEventId());
-        continue;
-      }
+    for (const item of dispatchQueue) {
       if (item.actionType !== 'msg5' && markCount >= effectiveMax) {
         hasBlockedCandidate = true;
         info('message-routing', `[ROUTING] [${chainId}] MARK-LIMIT | ${item.agentName}(${item.agentId}) 超出上限(${markCount}/${effectiveMax}) 状态=${item.mState.state} → 不标记不发送`, getEventId());
@@ -454,6 +404,11 @@ export async function executeMessageRouting(sessionKey: string, source: string) 
         setTeamTaskCompleted(true);
       }
       sendList.push(item);
+      // 预留机制(msg5): 仅在 msg5 实际派发(通过 CAS)时才消费 aborted 标志, 避免 CAS 跳过导致"清了却没发"。
+      if (item.actionType === 'msg5') {
+        const rec = getSessionRecordBySessionKey(item.ctxObj.sessionKey);
+        if (rec) rec.aborted = false;
+      }
       info('message-routing', `[ROUTING] [${chainId}] MARK | [${markCount}/${maxActivations}] ${item.agentName}(${item.agentId}) ${prevStatus}→processing, action=${item.actionLabel}`, getEventId());
     }
 
@@ -462,7 +417,7 @@ export async function executeMessageRouting(sessionKey: string, source: string) 
       const hasRunner = [...sessionActivityCache.values()]
         .some(r => r.fixable === true && r.status === 'processing');
       if (!hasRunner) {
-        for (const item of pendingList) {
+        for (const item of dispatchQueue) {
           if (item.actionType === 'skip' || item.actionType === 'msg5') continue;
           const prevStatus = getSessionRecordBySessionKey(item.ctxObj.sessionKey)?.status || '?';
           if (prevStatus !== 'ended') continue;
@@ -488,7 +443,7 @@ export async function executeMessageRouting(sessionKey: string, source: string) 
 
       setTimeout(async () => {
         try {
-          await executeDispatchAction({ type: item.actionType as 'msg1' | 'msg2' | 't7' }, item.ctxObj);
+          await executeDispatchAction({ type: item.actionType as 'msg1' | 'msg2' | 't7' | 'msg5' }, item.ctxObj);
           info('message-routing', `[ROUTING] [${chainId}] SENT | [${seq}/${sendList.length}] ${item.agentName}(${item.agentId}) action=${item.actionLabel}`, getEventId());
 
           // 发送成功后 10s，若仍未收到 onPromptBuild(agent 真实起 run)，翻 fixable=true
@@ -514,7 +469,7 @@ export async function executeMessageRouting(sessionKey: string, source: string) 
 
           // TOCTOU + fixable=false → 外部触发/清理窗口，不是路由唤醒的 → 与发送失败同款可恢复
           if (isTocTou) {
-            if (targetRecord) { targetRecord.status = 'ended'; writeSnapshotFile(targetSessionKey); }
+            if (targetRecord) { setStatusAndTime(targetRecord, 'ended'); writeSnapshotFile(targetSessionKey); }
             if (item.actionType === 'msg2') setTeamTaskCompleted(false);
             error('message-routing', `[ROUTING] [${chainId}] FAILED(TOCTOU-外部) | ${item.agentName}(${item.agentId}) ${err.message} — fixable=false，回退ended，30s后重试`, getEventId());
             setTimeout(() => {
@@ -529,7 +484,7 @@ export async function executeMessageRouting(sessionKey: string, source: string) 
           if (wasDelivered) {
             info('message-routing', `[ROUTING] [${chainId}] FAILED(已送达) | ${item.agentName}(${item.agentId}) ${err.message} — 保持processing`, getEventId());
           } else {
-            if (targetRecord) { targetRecord.status = 'ended'; writeSnapshotFile(targetSessionKey); }
+            if (targetRecord) { setStatusAndTime(targetRecord, 'ended'); writeSnapshotFile(targetSessionKey); }
             if (item.actionType === 'msg2') setTeamTaskCompleted(false);
             error('message-routing', `[ROUTING] [${chainId}] FAILED(未送达) | ${item.agentName}(${item.agentId}) ${err.message} — 回退ended，30s后重试`, getEventId());
             setTimeout(() => {

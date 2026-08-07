@@ -56,7 +56,7 @@ export {
 export { getSessionQueueTracker } from "./session-queue-tracker";
 
 // dispatch
-export { buildDispatchAction, markTargetProcessing, executeDispatchAction, isMember, isPM, getMemberByAgentId, loadTeamData, sortByT7Priority } from "./dispatch";
+export { buildDispatchAction, markTargetProcessing, executeDispatchAction, isMember, isPM, getMemberByAgentId, loadTeamData } from "./dispatch";
 
 // initialization
 import { info, getEventId } from "../shared/logger";
