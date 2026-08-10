@@ -31,6 +31,7 @@ import {
 import { fullReset } from "../shared/cache-coordinator";
 import { writeJsonSafe, writeFileWithRetry } from "../shared/json-atomic";
 import { readConfigRaw, readCoordClawJson, readTeamJson } from "../shared/config-store";
+import { createSessionKeyForAgent } from "../shared/session-key";
 import type {
   CreateProjectRequest,
   ProjectCreateResult,
@@ -138,36 +139,7 @@ function copyTemplateWithOverwrite(
   return result;
 }
 
-// ==================== SessionKey 创建（复用 session-key-generator） ====================
-
-async function createSessionKeyForAgent(
-  agentId: string,
-  label?: string,
-  caller: string = "project-create"
-): Promise<{ success: boolean; sessionKey?: string; error?: string }> {
-  const eventId = getEventId();
-  try {
-    const { callGatewayRpc } = await import("../shared/gateway-rpc");
-
-    const result = await callGatewayRpc({
-      method: "sessions.create",
-      params: { agentId, label },
-      timeoutMs: 10_000,
-    });
-
-    if (result && typeof result === "object" && result.key) {
-      info(caller, `[RPC] ${agentId} sessionKey 创建成功`, eventId);
-      return { success: true, sessionKey: result.key as string };
-    }
-
-    warn(caller, `[RPC] ${agentId} 响应无效: ${JSON.stringify(result).slice(0, 200)}`, eventId);
-    return { success: false, error: "Invalid response from sessions.create" };
-  } catch (err: any) {
-    const errMsg = err?.message || String(err);
-    error(caller, `[RPC] ${agentId} sessionKey 创建失败: ${errMsg}`, eventId);
-    return { success: false, error: errMsg };
-  }
-}
+// ==================== SessionKey 创建（已提升至 ../shared/session-key.ts，project-create 直接复用） ====================
 
 // ==================== 主入口 ====================
 

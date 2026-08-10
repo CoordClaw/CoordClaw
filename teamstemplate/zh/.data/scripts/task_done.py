@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 """
 task_done.py - 智能体任务完成信号发送工具
+**本代码严禁agent自行修改**
 
 命令参数：
 - --name : 智能体自己的名字（从 team.json 中匹配）
@@ -44,8 +45,8 @@ def utc_now_pair():
 def utc_iso_minus(minutes): return _utc(datetime.now(timezone.utc) - timedelta(minutes=minutes))
 
 # ── 功能开关：完成任务时自动标记未读消息为已读 ──
-MARK_READ_ON_DONE = True
-CLEANUP_TEMP = False
+MARK_READ_ON_DONE = True  
+CLEANUP_TEMP = False   
 
 # ── 路径配置 ──
 SCRIPT_DIR = Path(__file__).resolve().parent

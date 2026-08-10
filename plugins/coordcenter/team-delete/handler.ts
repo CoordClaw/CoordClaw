@@ -28,6 +28,7 @@ import {
 } from "../shared/agent-artifacts";
 import { writeJsonSafe, writeFileWithRetry } from "../shared/json-atomic";
 import { readConfigRaw, readCoordClawJson, readOpenClawJson, readTeamJsonByTeam } from "../shared/config-store";
+import { reconcileProjectSessionKeys } from "../shared/session-key";
 import type {
   DeleteTeamRequest,
   TeamDeleteResult,
@@ -363,6 +364,20 @@ export async function deleteTeam(
     removeFromLobsterAIDB(memberAgentIds);
     info(MODULE, `[Step7] agent 级产物清理已触发: ${memberAgentIds.length} 个 agent`, eventId);
     writeTeamDeleteLog(`agent artifacts cleanup triggered: ${memberAgentIds.length} agents`);
+  }
+
+  // ====== Step 6c: 激活转移后对账 sessionKey（非致命，best-effort） ======
+  if (activationTransfer?.activatedProjectId && activationTransfer?.activatedTeamId) {
+    try {
+      const atTeam = (coordclawData.teams || []).find((t: any) => t.id === activationTransfer.activatedTeamId);
+      const atProject = atTeam?.projects?.find((p: any) => p.id === activationTransfer.activatedProjectId);
+      if (atProject?.root) {
+        await reconcileProjectSessionKeys(atProject.root);
+        info(MODULE, `[Step6c] 激活转移项目 sessionKey 对账完成: ${atProject.root}`, eventId);
+      }
+    } catch (recErr: any) {
+      warn(MODULE, `[Step6c] 激活转移项目 sessionKey 对账失败(非致命): ${recErr.message}`, eventId);
+    }
   }
 
   // ====== 完成 ======

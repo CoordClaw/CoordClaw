@@ -22,7 +22,8 @@
   },
   "scripts": {
     "build": "tsc -p tsconfig.json && esbuild index.ts --bundle --platform=node --format=esm --outfile=dist/index.js --external:openclaw --external:@openclaw/*",
-    "typecheck": "tsc --noEmit -p tsconfig.json"
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "esbuild test/dispatch-queue.test.ts --bundle --platform=node --format=esm --outfile=test/.dispatch-queue.test.mjs && node test/.dispatch-queue.test.mjs"
   },
   "license": "MIT",
   "devDependencies": {

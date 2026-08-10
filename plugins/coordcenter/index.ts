@@ -62,7 +62,9 @@ import type { TokenUsage } from "./shared/types";
 import { applyRuntimeConfig, llmErrorConfig, HEALTH_RESCUE_LIMIT } from "./shared/runtime-config";
 import { deleteSnapshotFile, writeSnapshotFile, writePulseNotification } from "./session-snapshot";
 import { registerLlmInputDumpHook } from "./llm-input-dump";
-import { computeAndPersist, cacheSystemPrompt, setSessionApi } from "./token-stats/pool";
+import { computeAndPersist, cacheSystemPrompt } from "./token-stats/pool";
+import { setSessionApi } from "./shared/session-api";
+import { reconcileProjectSessionKeys } from "./shared/session-key";
 import { debug, info, warn, error, getEventId } from "./shared/logger";
 
 // ==================== 模块级状态 ====================
@@ -298,6 +300,15 @@ async function initAsync(ctx: BootContext, api: any): Promise<void> {
     deleteSnapshotFile();
   } catch (err: any) {
     warn("plugin", `[INIT] 项目配置加载失败（非致命），运行时服务继续启动: ${err.message}`, getEventId());
+  }
+
+  // Step C2: 启动对账（非致命，best-effort；Gateway 未就绪 / agent 未注册时 fail-open）
+  if (projectRoot) {
+    try {
+      await reconcileProjectSessionKeys(projectRoot);
+    } catch (err: any) {
+      warn("plugin", `[INIT] sessionKey 对账失败（非致命）: ${err.message}`, getEventId());
+    }
   }
 
   // Step D: 活动初始化（非致命）

@@ -27,6 +27,7 @@ import type {
 } from "./types";
 import { writeJsonSafe, writeJsonSafeOrThrow } from "../shared/json-atomic";
 import { readCoordClawJson, readJsonFile } from "../shared/config-store";
+import { reconcileProjectSessionKeys } from "../shared/session-key";
 
 const MODULE = "project-switch";
 
@@ -216,6 +217,17 @@ export async function switchProject(
     // team.json 更新失败不影响切换主流程，仅记录警告
     warn(MODULE, `[Step5] 更新 team.json 失败(非致命): ${err.message}`, eventId);
     writeProjectSwitchLog(`WARN: team.json update failed: ${err.message}`);
+  }
+
+  // ====== Step 6: 对账激活项目成员 sessionKey（非致命，best-effort） ======
+  try {
+    const reconcileRoot = expandPath(targetProject.root);
+    if (reconcileRoot) {
+      await reconcileProjectSessionKeys(reconcileRoot);
+      info(MODULE, `[Step6] 激活项目 sessionKey 对账完成: ${reconcileRoot}`, eventId);
+    }
+  } catch (step6Err: any) {
+    warn(MODULE, `[Step6] sessionKey 对账失败(非致命): ${step6Err.message}`, eventId);
   }
 
   // ====== 完成 ======

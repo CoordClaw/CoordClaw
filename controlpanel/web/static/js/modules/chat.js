@@ -35,6 +35,7 @@ const ChatModule = (function() {
     let _pollWebchatUrl = '';
     let _pollSessionKey = '';
     let _pollAiName = '';
+    let _expanded = new Set();       // 已展开的可折叠元素 key 集合（工具组/长文本统一），跨 overlay 由 resetPollState 清空
     const POLL_INTERVAL = 5000;      // 周期轮询间隔(ms)
 
     // ─── Markdown 解析 ────────────────────────────
@@ -155,7 +156,7 @@ const ChatModule = (function() {
 
     // ─── 历史消息加载 ──────────────────────────────
 
-    function addHistoryBubble(role, text, aiName, silent = false) {
+    function addHistoryBubble(role, text, aiName, silent = false, key = null) {
         const area = document.getElementById('chat-msg-area');
         if (!area) return null;
         const cssRole = role === 'assistant' ? 'ai' : role;
@@ -175,9 +176,11 @@ const ChatModule = (function() {
         if (long) {
             const body = wrapper.querySelector('.chat-msg-collapsed');
             const toggle = wrapper.querySelector('.chat-msg-toggle');
+            if (_expanded.has(key)) body.classList.remove('chat-msg-collapsed');  // 重建后回放展开态
             const onToggle = () => {
                 const collapsed = body.classList.toggle('chat-msg-collapsed');
                 toggle.textContent = collapsed ? I18N.t('chat_expand') : I18N.t('chat_collapse');
+                if (collapsed) _expanded.delete(key); else _expanded.add(key);    // 同步外置状态
             };
             toggle.addEventListener('click', onToggle);
             toggle.addEventListener('keydown', (e) => {
@@ -233,7 +236,7 @@ const ChatModule = (function() {
     }
 
     // 连续 >2 个 toolCall：折叠成一组，summary 可点展开/收起
-    function appendToolGroup(body, parts) {
+    function appendToolGroup(body, parts, key) {
         const group = document.createElement('div');
         group.className = 'chat-tool-group chat-tool-group-collapsed';
         const summary = document.createElement('div');
@@ -250,9 +253,11 @@ const ChatModule = (function() {
         group.appendChild(summary);
         group.appendChild(lines);
         body.appendChild(group);
+        if (_expanded.has(key)) group.classList.remove('chat-tool-group-collapsed');  // 重建后回放展开态
         const onToggle = () => {
             const collapsed = group.classList.toggle('chat-tool-group-collapsed');
             setLabel(collapsed);
+            if (collapsed) _expanded.delete(key); else _expanded.add(key);            // 同步外置状态
         };
         summary.addEventListener('click', onToggle);
         summary.addEventListener('keydown', (e) => {
@@ -307,62 +312,17 @@ const ChatModule = (function() {
             if (!_overlayEl) return;
             if (!data.ok || !Array.isArray(data.messages)) { showHistoryEmptyIfNeeded(area); return; }
 
-            // 滚动守卫：清空前紧邻一瞬用【当前】位置测（fetch/json 之后已是当前）
-            const distBottom = area.scrollHeight - area.scrollTop;
+            // 滚动守卫：在底部才重建（用户离底阅读→不破坏 DOM 与展开态）
             const atBottom = area.scrollHeight - area.scrollTop - area.clientHeight <= 60;
 
-            // 纯净阶段清空历史气泡（绝不碰 .chat-msg-system 与 doSend 直接子气泡）
-            area.querySelectorAll('.chat-bubble-wrapper, .chat-empty, .chat-loading').forEach(el => el.remove());
-
-            // 跨消息合并：同一轮 assistant 回复（被隐藏的 toolResult 隔开）合并为单个气泡，
-            // 用户消息作为回合边界。name 只在气泡顶部出现一次（卡片上方标签）。
-            let currentBody = null;     // 当前 assistant 气泡的内容容器
-            let toolRunBuffer = [];     // 连续 toolCall 缓冲（跨消息累积，文本/回合边界打断）
-
-            const ensureBody = () => {
-                if (!currentBody) currentBody = openAssistantBubble(_pollAiName, true);
-                return currentBody;
-            };
-            const flushToolRun = () => {
-                if (!toolRunBuffer.length) return;
-                const body = ensureBody();
-                if (toolRunBuffer.length > 2) appendToolGroup(body, toolRunBuffer);  // 连续 >2 折叠
-                else for (const p of toolRunBuffer) appendToolLine(body, p);         // ≤2 展开
-                toolRunBuffer = [];
-            };
-
-            for (const msg of data.messages) {
-                if (msg.role === 'toolResult') continue;            // 三类之外：隐藏（不打断 assistant 回合）
-                if (msg.role === 'user') {
-                    flushToolRun();                                 // 收尾上一轮 assistant
-                    currentBody = null;
-                    const text = typeof msg.content === 'string'
-                        ? msg.content
-                        : extractText(msg.content);                 // 兼容 user.content 为数组
-                    if (text && text.trim()) addHistoryBubble('user', text, _pollAiName, true);
-                } else if (msg.role === 'assistant') {
-                    const parts = Array.isArray(msg.content)
-                        ? msg.content
-                        : (typeof msg.content === 'string' ? [{ type: 'text', text: msg.content }] : []);
-                    for (const p of parts) {
-                        if (p.type === 'text') {
-                            if (p.text && p.text.trim()) {
-                                flushToolRun();                     // 文本打断 toolCall 连续性
-                                appendTextBlock(ensureBody(), p.text);
-                            }
-                        } else if (p.type === 'toolCall') {
-                            toolRunBuffer.push(p);                  // 跨消息累积连续 toolCall
-                        }
-                        // 其它 part 类型忽略
-                    }
-                }
-                // 其它 role（system 等）忽略
+            if (atBottom) {
+                // 纯净阶段清空历史气泡（绝不碰 .chat-msg-system 与 doSend 直接子气泡）
+                area.querySelectorAll('.chat-bubble-wrapper, .chat-empty, .chat-loading').forEach(el => el.remove());
+                renderHistoryBubbleTree(area, data.messages, _pollAiName);
+                showHistoryEmptyIfNeeded(area);                    // 无任何消息则提示空
+                area.scrollTop = area.scrollHeight;                // 在底部→跟随到底
             }
-            flushToolRun();                                         // 收尾最后一轮
-            showHistoryEmptyIfNeeded(area);                        // 无任何消息则提示空
-
-            if (atBottom) area.scrollTop = area.scrollHeight;             // R1：在底部→跟随到底
-            else area.scrollTop = Math.max(0, area.scrollHeight - distBottom);  // R2：离底→保持离底距离
+            // 离底：跳过删除+重建（仅更新不渲染），保留用户阅读位置与展开态
         } catch {
             if (loadingEl) loadingEl.remove();
             showHistoryEmptyIfNeeded(area);                        // 加载失败兜底显示空提示
@@ -373,13 +333,74 @@ const ChatModule = (function() {
         _pollTimer = setTimeout(() => pollTick(false), POLL_INTERVAL);   // 递归 setTimeout：poll 完成才排下轮
     }
 
+    // 统一复位轮询相关模块级状态（_streaming + _expanded + 定时器），避免跨 overlay 泄漏
+    function resetPollState() {
+        _streaming = false;
+        _expanded.clear();
+        clearTimeout(_pollTimer);
+    }
+
+    // 从服务端历史消息整段渲染气泡树（统一真相；工具组/长文本折叠态由 _expanded 外置回放）
+    function renderHistoryBubbleTree(area, messages, aiName) {
+        // 跨消息合并：同一轮 assistant 回复（被隐藏的 toolResult 隔开）合并为单个气泡，
+        // 用户消息作为回合边界。name 只在气泡顶部出现一次（卡片上方标签）。
+        let currentBody = null;     // 当前 assistant 气泡的内容容器
+        let toolRunBuffer = [];     // 连续 toolCall 缓冲（跨消息累积，文本/回合边界打断）
+        let assistantSeq = 0;       // assistant 气泡序位（工具组 key 用）
+        let runSeq = 0;             // 当前 assistant 气泡内 toolRun 段序位
+        let msgSeq = 0;             // 消息序位（长文本 key 用）
+
+        const ensureBody = () => {
+            if (!currentBody) { currentBody = openAssistantBubble(aiName, true); assistantSeq++; runSeq = 0; }
+            return currentBody;
+        };
+        const flushToolRun = () => {
+            if (!toolRunBuffer.length) return;
+            const body = ensureBody();
+            runSeq++;
+            const key = `tool:${assistantSeq}:${runSeq}`;
+            if (toolRunBuffer.length > 2) appendToolGroup(body, toolRunBuffer, key);  // 连续 >2 折叠
+            else for (const p of toolRunBuffer) appendToolLine(body, p);              // ≤2 展开
+            toolRunBuffer = [];
+        };
+
+        for (const msg of messages) {
+            if (msg.role === 'toolResult') continue;            // 三类之外：隐藏（不打断 assistant 回合）
+            if (msg.role === 'user') {
+                flushToolRun();                                 // 收尾上一轮 assistant
+                currentBody = null;
+                msgSeq++;
+                const text = typeof msg.content === 'string'
+                    ? msg.content
+                    : extractText(msg.content);                 // 兼容 user.content 为数组
+                if (text && text.trim()) addHistoryBubble('user', text, aiName, true, `long:${msgSeq}`);
+            } else if (msg.role === 'assistant') {
+                const parts = Array.isArray(msg.content)
+                    ? msg.content
+                    : (typeof msg.content === 'string' ? [{ type: 'text', text: msg.content }] : []);
+                for (const p of parts) {
+                    if (p.type === 'text') {
+                        if (p.text && p.text.trim()) {
+                            flushToolRun();                     // 文本打断 toolCall 连续性
+                            appendTextBlock(ensureBody(), p.text);
+                        }
+                    } else if (p.type === 'toolCall') {
+                        toolRunBuffer.push(p);                  // 跨消息累积连续 toolCall
+                    }
+                    // 其它 part 类型忽略
+                }
+            }
+            // 其它 role（system 等）忽略
+        }
+        flushToolRun();                                         // 收尾最后一轮
+    }
+
     // 启动历史轮询：设置上下文 + 立即首轮（带 spinner）+ 之后周期轮询
     function startPolling(webchatUrl, sessionKey, aiName) {
         _pollWebchatUrl = webchatUrl;
         _pollSessionKey = sessionKey;
         _pollAiName = aiName;
-        _streaming = false;                              // 全新 overlay，先复位
-        clearTimeout(_pollTimer);
+        resetPollState();                                // 全新 overlay，统一复位
         pollTick(true);
     }
 
@@ -389,8 +410,7 @@ const ChatModule = (function() {
         const webchatUrl = $A.config?.webchatUrl || $A.config?.webchatUrl;
         if (!webchatUrl) { alert(CFG.alertNoWebchat); return; }
         if (_overlayEl) _overlayEl.remove();
-        clearTimeout(_pollTimer);                       // H1：替换旧 overlay 时清掉遗留轮询定时器（堵 X12 孤儿定时器）
-        _streaming = false;                             // H1：复位，避免旧 overlay 的 stream 状态串台到新 overlay（堵 X13）
+        resetPollState();                               // H1：替换旧 overlay 时统一复位（堵 X12 孤儿定时器 / X13 串台）
 
         const overlay = document.createElement('div');
         overlay.className = 'chat-widget-overlay';
@@ -436,8 +456,7 @@ const ChatModule = (function() {
         const closeFn = () => {
             if (opts.showMonitor) AppApi.postStopTeamMonitor().catch(() => {});
             ModelModule.unregister(overlay.querySelector('#chat-input-model'));
-            clearTimeout(_pollTimer);                   // H5：关闭弹窗必须清定时器（堵 I 泄漏）
-            _streaming = false;
+            resetPollState();                           // H5：关闭弹窗必须统一复位（堵 I 泄漏）
             overlay.remove(); _overlayEl = null;
         };
         overlay.querySelector('.chat-widget-close').addEventListener('click', closeFn);
@@ -592,8 +611,7 @@ const ChatModule = (function() {
 
     function closeOverlay() {
         if (_overlayEl) {
-            clearTimeout(_pollTimer);                   // 程序化关闭同样清定时器 + 复位
-            _streaming = false;
+            resetPollState();                           // 程序化关闭同样统一复位
             _overlayEl.remove(); _overlayEl = null;
         }
     }

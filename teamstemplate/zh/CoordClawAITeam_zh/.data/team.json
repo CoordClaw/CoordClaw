@@ -52,10 +52,10 @@
     ]
   },
   "checktaskfeedback": {
-    "enabled": false,
+    "enabled": true,
     "splice_role_prompt": false,
     "message": [
-      "【群聊反馈提醒】**之前发过不做数，要重新反馈，严禁口头说反馈了**\n1、你是不是完成本次会话后没有发送群聊消息？\n2、完成T5后使用exec工具执行命令：`python <#projectroot#>/.data/scripts/chat_manager.py send --from '<自己的姓名>' --to '<接收者姓名>' --content '<消息>'`进行群聊反馈。\n3、每一次会话，哪怕没有任何任务，只是聊天，也需要发送群聊消息向你的上级反馈你现在的状态，即执行T4标准动作。\n4、如果反复收到该提醒，你需要从系统提示词中确认是否正确使用脚本工具、执行流程是否完整。"
+      "你提前停止了任务，没有执行T4和T5标准动作，这违反了禁令！无需再执行T1标准动作，检查前文创建的任务清单（tasklist）是否完成，检查是否执行T3标准动作，请继续完成未完任务，最后必须以T5标准动作完成本次任务！"
     ]
   },
   "checkmemberstatus": {

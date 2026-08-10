@@ -12,6 +12,7 @@ import { encode } from "gpt-tokenizer";
 import { appendFileWithRetry } from "../shared/json-atomic";
 import { getOpenClawUserDir, getCoordClawJsonPath } from "../shared/paths";
 import { warn, getEventId } from "../shared/logger";
+import { getSessionApi } from "../shared/session-api";
 
 /** 单条统计记录 */
 export interface TokenStatsEntry {
@@ -135,9 +136,7 @@ function resolveSessionDir(agentId: string): string {
   return path.join(getOpenClawUserDir(), "agents", agentId, "sessions");
 }
 
-/** 框架会话 API（由 index.ts register 注入），用于直接取 sessionFile 绝对路径，避免按 sessionId 猜文件名 */
-let _sessionApi: any = null;
-export function setSessionApi(a: any) { _sessionApi = a; }
+/** 框架会话 API 单例已提升至 ../shared/session-api（set/getSessionApi），此处不再持有私有副本 */
 
 /**
  * 找 session 文件（三层递进，复用框架单一真相源）：
@@ -152,7 +151,7 @@ function findSessionFile(sessionKey: string, sessionId: string, agentId: string)
 
   // L1 直接读 sessionFile：框架 API（agentId 由框架从 sessionKey 推导，彻底绕开 index.ts 脆弱兜底）
   try {
-    const e = _sessionApi?.getSessionEntry?.({ sessionKey });
+    const e = getSessionApi()?.getSessionEntry?.({ sessionKey });
     if (e?.sessionFile) {
       const p = path.isAbsolute(e.sessionFile) ? e.sessionFile : path.join(resolveSessionDir(aid), e.sessionFile);
       if (fs.existsSync(p)) return p; // 防 phantom：转录被 prune 但 entry 残留

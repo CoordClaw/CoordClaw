@@ -52,10 +52,18 @@ export async function loadTeamData() {
 
 export type DispatchActionType = 'msg1' | 'msg2' | 't7' | 'msg5' | 'skip';
 
+// t7 方法输出契约：blocksReset 由 t7 方法在源头声明（NEEDS_GROUPCHAT_FEEDBACK 非 PM 分支 与 NEEDS_GROUPCHAT_AND_UNREAD(t7) 均为 true），
+// 门控 needsT7ResetGate 只读此语义标志，永不匹配 't7' 字符串，使 t7 可自由增删机制/改名而不动门控。
+export interface DispatchAction {
+  type: DispatchActionType;
+  label: string;
+  blocksReset?: boolean;
+}
+
 export function buildDispatchAction(
   ctxObj: AgentDispatchContext,
   teamTaskCompleted: boolean
-): { type: DispatchActionType; label: string } {
+): DispatchAction {
   // 预留机制: abort 通知(msg5) —— 仅被 abort 的 trigger 自身处理, 避免旁观 pass 混入他人 abort 导致重复/错上下文。
   if (ctxObj.aborted && ctxObj.isTrigger) {
     if (!isCheckEnabled(ctxObj.teamData, 'checkdeadlockstatus')) {
@@ -86,7 +94,7 @@ export function buildDispatchAction(
       if (!isCheckEnabled(ctxObj.teamData, 'checktaskfeedback')) {
         return { type: 'skip', label: '跳过(checktaskfeedback已关闭)' };
       }
-      return { type: 't7', label: '发送T7通知(查询群聊结果)' };
+      return { type: 't7', label: '发送T7通知(查询群聊结果)', blocksReset: true };
 
     case AgentLifecycleState.HAS_UNREAD_MESSAGES:
       if (!isCheckEnabled(ctxObj.teamData, 'checkunread')) {
@@ -95,10 +103,16 @@ export function buildDispatchAction(
       return { type: 'msg1', label: '发送msg1(未读提醒)' };
 
     case AgentLifecycleState.NEEDS_GROUPCHAT_AND_UNREAD:
+      // t7 优先（提醒处理完上轮群聊任务）；t7 关闭后降级为 msg1（未读提醒）。
+      // 全员统一（PM 与非 PM 同规则），去掉原 PM 硬编码 msg1 的特例。
+      // 不进 state-machine 的 T7→T1 兜底链（该态本就存在未读，兜底链的 deleted>0 守卫会导致静默 skip）。
+      if (isCheckEnabled(ctxObj.teamData, 'checktaskfeedback')) {
+        return { type: 't7', label: '发送T7通知(查询群聊结果)', blocksReset: true };  // 复用 :97 同源 t7 声明
+      }
       if (!isCheckEnabled(ctxObj.teamData, 'checkunread')) {
         return { type: 'skip', label: '跳过(checkunread已关闭)' };
       }
-      return { type: 'msg1', label: isPM ? 'PM有群聊+未读 → 发送msg1' : '有群聊+未读 → 发送合并提醒(msg1+msg3)' };
+      return { type: 'msg1', label: '有群聊+未读 → 发送msg1(未读提醒)' };
 
     default:
       return { type: 'skip', label: '跳过(未知状态)' };

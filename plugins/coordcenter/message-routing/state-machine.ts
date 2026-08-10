@@ -37,6 +37,7 @@ import { calculateTriggerState, calculateOtherMemberState } from "./state/calcul
 import { getRecentReadRecords, resetReadStatusForAgent } from "./database/manager";
 import { getSessionQueueTracker } from "./session-queue-tracker";
 import { setStatusAndTime } from './transition';
+import { buildDispatchQueue, compareFirstUnreadAt, needsT7ResetGate, type PendingDispatch } from "./dispatch-queue";
 
 function getEarliestUnreadAt(receivedUnreadMessages: { created_at: string }[]): string | null {
   if (!receivedUnreadMessages || receivedUnreadMessages.length === 0) return null;
@@ -111,16 +112,22 @@ async function updateStatus(sessionKey: string, status: string, source: string, 
       const { teamData } = await loadTeamData();
       const msgRobotEnabled = teamData.msg_robot !== false && teamData.msg_robot !== "false";
 
-      // 自动重置仅在 msg_robot 启用时执行
-      if (msgRobotEnabled && teamData.resetcontext?.internal_plugin === true) {
-        const { resetWithGuard } = await import('../session-reset/handler');
-        await resetWithGuard(sessionKey);
-        info('message-routing', `[AUTO-RESET] sessionKey reset after session end | ${sessionKey}`, getEventId());
-      }
-
-      // 消息路由仅在 msg_robot 启用时执行
+      // 消息路由仅在 msg_robot 启用时执行；auto-reset 依据其返回的 triggerNeedsT7 门控（见下）
       if (msgRobotEnabled) {
-        await executeMessageRouting(sessionKey, source);
+        const decision = await executeMessageRouting(sessionKey, source)
+          .catch(() => ({ triggerNeedsT7: false }));
+        const triggerNeedsT7 = decision?.triggerNeedsT7 ?? false;
+
+        // auto-reset：仅当 resetcontext 开启 且 trigger 本轮回无需发 t7（已完成/降级为 msg1）时执行
+        if (teamData.resetcontext?.internal_plugin === true && !triggerNeedsT7) {
+          try {
+            const { resetWithGuard } = await import('../session-reset/handler');
+            await resetWithGuard(sessionKey);
+            info('message-routing', `[AUTO-RESET] reset after session end (triggerNeedsT7=${triggerNeedsT7}) | ${sessionKey}`, getEventId());
+          } catch (e: any) {
+            info('message-routing', `[AUTO-RESET] skipped or failed: ${e.message} | ${sessionKey}`, getEventId());
+          }
+        }
       }
     } catch (err: any) {
       info('message-routing', `[AUTO-RESET] skipped or failed: ${err.message} | ${sessionKey}`, getEventId());
@@ -131,7 +138,7 @@ async function updateStatus(sessionKey: string, status: string, source: string, 
 }
 
 // ==================== 消息路由 ====================
-export async function executeMessageRouting(sessionKey: string, source: string) {
+export async function executeMessageRouting(sessionKey: string, source: string): Promise<{ triggerNeedsT7: boolean } | undefined> {
   if (globalLlmState.error && !source.startsWith("force-route")) {
     info('message-routing', `[ROUTING] BLOCKED | global LLM error flag set (source=${source})`, getEventId());
     return;
@@ -145,6 +152,7 @@ export async function executeMessageRouting(sessionKey: string, source: string) 
 
   const agentId = record.agentId;
   const agentName = record.agentName;
+  let triggerNeedsT7 = false;   // 状态驱动 auto-reset 门控信号（函数顶层作用域，try 内外均可见）
 
   const chainId = `${generateChainId()}/${agentName}`;
 
@@ -271,35 +279,7 @@ export async function executeMessageRouting(sessionKey: string, source: string) 
       info('message-routing', `[ROUTING] [${chainId}] [DIAG-READS] 最近${recentReads.length}条已读记录(read_at): ${JSON.stringify(recentReads)}`, getEventId());
     }
 
-    interface PendingDispatch {
-      ctxObj: AgentDispatchContext;
-      actionType: string;
-      actionLabel: string;
-      isPM: boolean;
-      isTrigger: boolean;
-      agentName: string;
-      agentId: string;
-      mState: any;
-      firstUnreadAt: string | null;
-    }
-    // 解耦核心: 列表分桶拼接 + 仅 msg1 桶内排序。skip 直接丢弃, 永不进排序(消除非传递比较器污染 msg1 顺序)。
-    function compareFirstUnreadAt(a: PendingDispatch, b: PendingDispatch): number {
-      const fa = a.firstUnreadAt, fb = b.firstUnreadAt;
-      if (fa && fb) return fa.localeCompare(fb); // 最早未读(滞留最久)排前
-      if (fa) return -1;                          // null 置最末, 保传递性
-      if (fb) return 1;
-      return 0;
-    }
-    function buildDispatchQueue(list: PendingDispatch[]): PendingDispatch[] {
-      const buckets: Record<string, PendingDispatch[]> = { msg5: [], t7: [], msg2: [], msg1: [] };
-      for (const e of list) {
-        if (e.actionType === 'skip') continue;            // skip 直接丢弃
-        (buckets[e.actionType] ?? buckets.msg1).push(e);  // msg5/t7/msg2 各≤1, 占位无需排序
-      }
-      buckets.msg1.sort(compareFirstUnreadAt);             // 唯一真实排序, 隔离纯函数
-      return [...buckets.msg5, ...buckets.t7, ...buckets.msg2, ...buckets.msg1];
-    }
-
+    // 分桶/排序/门控纯函数已外移至 ./dispatch-queue（不依赖 openclaw，可独立单测），此处复用。
     const pendingList: PendingDispatch[] = [];
 
     for (const m of members) {
@@ -338,7 +318,7 @@ export async function executeMessageRouting(sessionKey: string, source: string) 
       info('message-routing', `[ROUTING] [${chainId}] [DISPATCH-DETAIL] ${mState.agentName}(${mAgentId}) isPM=${ctxObj.isPM} isTrigger=${isTrigger} teamHasUnread=${teamHasUnread} state=${mState.state}`, getEventId());
       info('message-routing', `[ROUTING] [${chainId}] [DISPATCH] ${mState.agentName}(${mAgentId})${ctxObj.isPM ? '(PM)' : ''} → ${mState.state} → ${action.label}`, getEventId());
 
-      pendingList.push({ ctxObj, actionType: action.type, actionLabel: action.label, isPM: ctxObj.isPM, isTrigger, agentName: mState.agentName, agentId: mAgentId, mState, firstUnreadAt: mState.firstUnreadAt });
+      pendingList.push({ ctxObj, blocksReset: action.blocksReset === true, actionType: action.type, actionLabel: action.label, isPM: ctxObj.isPM, isTrigger, agentName: mState.agentName, agentId: mAgentId, mState, firstUnreadAt: mState.firstUnreadAt });
     }
 
     // T7→T1 兜底：trigger 需要反馈但 T7 关闭 → 重置已读 + 发 msg1 唤醒（仅 skip，不碰 msg2）
@@ -351,8 +331,9 @@ export async function executeMessageRouting(sessionKey: string, source: string) 
           const deleted = await resetReadStatusForAgent(projectRoot, agentId, triggerStartedAt, triggerEndedAt);
           info('message-routing', `[ROUTING] [${chainId}] T7→T1 | ${triggerState.agentName}(${agentId}) deleted ${deleted} read records`, getEventId());
           if (deleted > 0) {
-            triggerEntry.actionType = 'msg1';
-            triggerEntry.actionLabel = 'T7→T1: 发送msg1(未读提醒)';
+          triggerEntry.actionType = 'msg1';
+          triggerEntry.actionLabel = 'T7→T1: 发送msg1(未读提醒)';
+          triggerEntry.blocksReset = false;   // 降级=放行 reset：语义正确，门控随标志放行（防御未来 t7 机制变更）
             info('message-routing', `[ROUTING] [${chainId}] T7→T1 | ${triggerState.agentName}(${agentId}) skip → msg1`, getEventId());
           }
         }
@@ -364,6 +345,9 @@ export async function executeMessageRouting(sessionKey: string, source: string) 
 
     // 解耦: 分桶拼接 + 仅 msg1 内排序。skip 直接丢弃, 绝不进排序(消除非传递比较器污染)。
     const dispatchQueue = buildDispatchQueue(pendingList);
+
+    // 状态驱动 auto-reset 门控信号：trigger 本轮回需发 t7（未完成/需群聊反馈）→ 不 reset
+    triggerNeedsT7 = needsT7ResetGate(dispatchQueue);
 
     info('message-routing', `[ROUTING] [${chainId}] ===== Phase 2: 乐观标记 (最多 ${maxActivations}) =====`, getEventId());
 
@@ -503,5 +487,7 @@ export async function executeMessageRouting(sessionKey: string, source: string) 
     info('message-routing', `[ROUTING] [${chainId}] ===== ${agentName}(${agentId}) 消息分发结束 ===== 发送: ${sendList.length} | 窗口时长: ${windowDurationStr}`, getEventId());
   } catch (err: any) {
     error('message-routing', `[ROUTING] ERROR | ${err.message} | ${sessionKey}`, getEventId());
+    return;   // 路由失败 → 返回 void，updateStatus 按"可 reset"兜底
   }
+  return { triggerNeedsT7 };
 }
