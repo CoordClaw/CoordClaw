@@ -15,6 +15,7 @@
     "external_tools": false
   },
   "max_activations": 2,
+  "auto_block_throttle":true,
   "lifecycle_end_timeout_ms": 1800000,
   "note": "Project description information",
   "llm_error": {
@@ -50,10 +51,10 @@
     ]
   },
   "checktaskfeedback": {
-    "enabled": false,
+    "enabled": true,
     "splice_role_prompt": false,
     "message": [
-      "[Group Chat Feedback Reminder] **Previous sends do not count; must resend. Strictly prohibited to verbally say feedback was sent.**\n1. Did you not send a group chat message after completing this session?\n2. After completing T5, use exec tool to execute command: `python <#projectroot#>/.data/scripts/chat_manager.py send --from '<Your Name>' --to '<Recipient Name>' --content '<Message>'` for group chat feedback.\n3. Every session, even if there is no task, just chatting, also needs to send a group chat message to your superior to feedback your current status, i.e., execute T4 standard action.\n4. If you repeatedly receive this reminder, you need to confirm from the system prompt whether you are correctly using the script tool and whether the execution process is complete."
+      "You prematurely stopped the task and failed to execute the standard actions T4 and T5, which violates the prohibition! There is no need to execute standard action T1 again. Check whether the tasklist file created earlier has been completed, check whether standard action T3 has been executed, please continue to complete the unfinished tasks, and finally, you must complete this task with standard action T5!"
     ]
   },
   "checkmemberstatus": {

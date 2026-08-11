@@ -42,6 +42,7 @@ export interface AgentActivityRecord {
   updatedAt: string;
   aborted: boolean;
   fixable: boolean;
+  completedNormally?: boolean; // 上轮正常完成标记: t7(blocksReset)→false(阻塞); 其余(含processing→skip)→true。容量层节流读取。
   lastRunError?: boolean;
   totalTokens: number;
   totalToolCalls: number;

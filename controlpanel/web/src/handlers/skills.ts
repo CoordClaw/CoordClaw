@@ -4,8 +4,8 @@
  */
 
 import type { IncomingMessage, ServerResponse } from 'node:http';
-import { readFileSync, existsSync, readdirSync } from 'node:fs';
-import { join } from 'node:path';
+import { readFileSync, existsSync, readdirSync, cpSync, mkdirSync, rmSync } from 'node:fs';
+import { join, resolve } from 'node:path';
 import { homedir } from 'node:os';
 import { sendJSON, parseBody } from '../lib/response.js';
 import { getOpenClawUserDir, OPENCLAW_JSON_FILENAME, SKILL_MD_FILENAME, COORDCLAW_CONFIG_PATH } from '../config-resolver.js';
@@ -270,34 +270,99 @@ export async function updateMemberSkills(req: IncomingMessage, res: ServerRespon
 
 // ─── 安装 / 打开目录 ─────────────────────────────────
 
+// ─── 安装辅助 ───────────────────────────────────────
+
+/** H5: 防路径穿越 / Windows 非法字符；剥离分隔符与 ..，保留其余（含空格） */
+function sanitizeSkillName(name: string): string {
+  const cleaned = name
+    .replace(/[\\/:*?"<>|]/g, '')
+    .replace(/\.{2,}/g, '')
+    .trim();
+  if (!cleaned || cleaned === '.' || cleaned === '..') return '';
+  return cleaned;
+}
+
+/** 复制文件夹；EPERM/EBUSY/ETXTBSY（只读位 / 锁误报）→ 清残留重试一次 */
+function copySkillDir(src: string, dst: string): void {
+  try {
+    cpSync(src, dst, { recursive: true });
+  } catch (e: any) {
+    if (e && (e.code === 'EPERM' || e.code === 'EBUSY' || e.code === 'ETXTBSY')) {
+      try {
+        rmSync(dst, { recursive: true, force: true });
+        cpSync(src, dst, { recursive: true });
+        return;
+      } catch { /* fall through to rethrow */ }
+    }
+    throw e;
+  }
+}
+
 /** POST /api/install-skill */
 export async function handleInstallSkill(req: IncomingMessage, res: ServerResponse): Promise<void> {
   try {
-    const { sourcePath } = await parseBody(req);
-    if (!sourcePath) { sendJSON(res, 400, { error: '缺少 sourcePath' }); return; }
+    const { sourcePath, force } = await parseBody(req);
+    if (!sourcePath) { sendJSON(res, 400, { error: 'install_skill_no_path' }); return; }
     const srcMd = join(sourcePath, SKILL_MD_FILENAME);
     if (!existsSync(srcMd)) {
-      sendJSON(res, 400, { error: '所选文件夹不包含 ' + SKILL_MD_FILENAME });
+      sendJSON(res, 400, { error: 'install_skill_no_skillmd' });
       return;
     }
     const mdContent = readFileSync(srcMd, 'utf-8').slice(0, 4096);
     const fmMatch = mdContent.match(/^---\s*\n([\s\S]*?)\n---/);
     if (!fmMatch) {
-      sendJSON(res, 400, { error: SKILL_MD_FILENAME + ' 缺少有效的 YAML frontmatter' });
+      sendJSON(res, 400, { error: 'install_skill_no_frontmatter' });
       return;
     }
     const descMatch = fmMatch[1].match(/^description:\s*(.+)$/m);
     if (!descMatch) {
-      sendJSON(res, 400, { error: SKILL_MD_FILENAME + ' 缺少 description 字段，无效技能' });
+      sendJSON(res, 400, { error: 'install_skill_no_description' });
       return;
     }
     const nameMatch = fmMatch[1].match(/^name:\s*(.+)$/m);
-    const skillName = nameMatch ? nameMatch[1].trim().replace(/^["']|["']$/g, '') : sourcePath.split(/[\\/]/).pop()!;
+    let skillName = nameMatch ? nameMatch[1].trim().replace(/^["']|["']$/g, '') : sourcePath.split(/[\\/]/).pop()!;
 
-    // ★ 不再复制文件夹，仅校验 + 注册
+    // H5: 防路径穿越 / 非法字符
+    skillName = sanitizeSkillName(skillName);
+    if (!skillName) {
+      sendJSON(res, 400, { error: 'install_skill_name_invalid' });
+      return;
+    }
+
+    const dstParent = join(getOpenClawUserDir(), 'skills');
+    const dst = join(dstParent, skillName);
+
+    // H10: 自装守卫 — 源恰是目标目录，直接成功（避免 cpSync 自拷贝报错）
+    if (resolve(sourcePath) === resolve(dst)) {
+      sendJSON(res, 200, { success: true, skillName });
+      return;
+    }
+
+    // 同名冲突 → 返回 conflict 信号（前端弹窗确认）
+    if (existsSync(dst) && !force) {
+      sendJSON(res, 200, { success: false, conflict: true, skillName });
+      return;
+    }
+
+    // 目录不存在就创建（首次安装）
+    mkdirSync(dstParent, { recursive: true });
+
+    // 干净覆盖：先清旧残留再拷（cpSync 是合并式，不清旧文件）
+    if (force || existsSync(dst)) {
+      rmSync(dst, { recursive: true, force: true });
+    }
+
+    // 复制文件夹到 openclaw 内置默认技能目录（无需注册额外的 extraDirs）
+    copySkillDir(sourcePath, dst);
+
+    // H14: 失效 open-dir 扫描缓存，使新技能可被定位
+    invalidateSkillCache();
+
     sendJSON(res, 200, { success: true, skillName });
   } catch (e: any) {
-    sendJSON(res, 500, { error: e.message });
+    // H4: 返回 i18n key 而非 e.message
+    const key = (e && e.code === 'EPERM') ? 'install_skill_eperm' : 'install_skill_copy_fail';
+    sendJSON(res, 500, { error: key });
   }
 }
 

@@ -66,6 +66,14 @@ export const zh: Record<string, string> = {
     skill_install_duplicate: `技能 "{0}" 已存在`,
     browse_project_title: `选择项目文件夹`,
     browse_skill_title: `选择技能文件夹`,
+    skill_install_overwrite_confirm: `技能 "{0}" 已存在，是否覆盖安装？`,
+    install_skill_no_path: `未提供技能文件夹路径`,
+    install_skill_no_skillmd: `所选文件夹不包含 SKILL.md`,
+    install_skill_no_frontmatter: `SKILL.md 缺少有效的 YAML frontmatter`,
+    install_skill_no_description: `SKILL.md 缺少 description 字段，无效技能`,
+    install_skill_name_invalid: `技能名称非法（禁止使用 / \\ : * ? " < > | 与 ..）`,
+    install_skill_eperm: `文件被占用或无写入权限，无法安装技能`,
+    install_skill_copy_fail: `复制技能文件夹失败`,
 
     // ╔══════════════════════════════════════╗
     // ║  🔥 团队创建对话 — 频繁更新区域 🔥  ║
@@ -401,6 +409,14 @@ export const en: Record<string, string> = {
     skill_install_duplicate: `Skill "{0}" already exists`,
     browse_project_title: `Select Project Folder`,
     browse_skill_title: `Select Skill Folder`,
+    skill_install_overwrite_confirm: `Skill "{0}" already exists. Overwrite and install?`,
+    install_skill_no_path: `No skill folder path provided`,
+    install_skill_no_skillmd: `Selected folder does not contain SKILL.md`,
+    install_skill_no_frontmatter: `SKILL.md missing valid YAML frontmatter`,
+    install_skill_no_description: `SKILL.md missing description field, invalid skill`,
+    install_skill_name_invalid: `Invalid skill name (forbidden: / \\ : * ? " < > | and ..)`,
+    install_skill_eperm: `File is locked or no write permission, cannot install skill`,
+    install_skill_copy_fail: `Failed to copy skill folder`,
 
     // ╔══════════════════════════════════════╗
     // ║  🔥 Team Creation — HOT ZONE 🔥     ║

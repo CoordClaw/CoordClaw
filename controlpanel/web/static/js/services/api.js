@@ -13,7 +13,9 @@ const AppApi = (function() {
         const qs = params ? '?' + new URLSearchParams(
             Object.entries(params).filter(([,v]) => v != null && v !== '')
         ).toString() : '';
-        return fetch(BASE + url + qs);
+        // 防浏览器 HTTP 缓存：控制面板 API 均为易变实时数据，不应被缓存
+        // （否则如 /api/skills 初次加载的响应会被缓存，安装新技能后刷新列表仍拿到旧响应）
+        return fetch(BASE + url + qs, { cache: 'no-store' });
     }
 
     function _post(url, body) {
@@ -143,8 +145,11 @@ const AppApi = (function() {
 
     function getSkills(refresh)     { return _get('/api/skills', refresh ? { refresh: 1 } : {}); }
     function postSkillToggle(name)  { return _post('/api/skills/toggle', { name }); }
-    function postInstallSkill(sourcePath) {
-        return _post('/api/install-skill', { sourcePath });
+    function postInstallSkill(sourcePath, force) {
+        return _post('/api/install-skill', { sourcePath, force: !!force });
+    }
+    function postRefreshSkills() {
+        return _post('/api/skills/refresh', {});
     }
     function getOpenSkillDir(name)  { return _get('/api/open-skill-dir', { name }); }
     function getMemberSkills(agentId) {
@@ -189,7 +194,7 @@ const AppApi = (function() {
         postDeleteTeam, postRegisterTeam, postStartTeamMonitor, postStopTeamMonitor, postRenameTeam, postRenameProject,
         postOpenDir, postOpenFile, postOpenFolder, postOpenTeamsoul,
         postOpenTeamDir, postOpenTeamRule, getBrowseFolder, getBrowseFile,
-        getSkills, postSkillToggle, postInstallSkill, getOpenSkillDir, postImportTeamTpkg, postExportTeamTpkg,
+        getSkills, postSkillToggle, postInstallSkill, postRefreshSkills, getOpenSkillDir, postImportTeamTpkg, postExportTeamTpkg,
         getMemberSkills, putMemberSkills,
         getModels, postModelConfig,
         getDatabaseStatus, postRestoreDatabase,

@@ -1,7 +1,7 @@
 /**
  * CoordClaw Center
  *
- * v19.50 — 团队协调中枢系统
+ * 团队协调中枢系统（版本号以 package.json 为准，禁止硬编码）
  *
  * 架构：信号层 + 功能分发 + Channel 扩展
  * - 信号层：每个钩子/事件只注册一次（before_prompt_build / before_tool_call / agent_end）
@@ -66,12 +66,13 @@ import { computeAndPersist, cacheSystemPrompt } from "./token-stats/pool";
 import { setSessionApi } from "./shared/session-api";
 import { reconcileProjectSessionKeys } from "./shared/session-key";
 import { debug, info, warn, error, getEventId } from "./shared/logger";
+import { getPluginVersion } from "./shared/plugin-version";
 
 // ==================== 模块级状态 ====================
 
 const PLUGIN_NAME = 'CoordClaw Center';
-const PLUGIN_VERSION = 'v19.50';
-const PLUGIN_DESCRIPTION = 'v19.50 — 团队协调中枢系统。';
+const PLUGIN_VERSION = getPluginVersion();
+const PLUGIN_DESCRIPTION = `${PLUGIN_VERSION} — 团队协调中枢系统。`;
 
 const toolCallCounts = new Map<string, number>();
 const sessionToolCallCounts = new Map<string, number>();

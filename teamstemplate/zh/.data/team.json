@@ -15,6 +15,7 @@
     "external_tools": false
   },
   "max_activations": 2,
+  "auto_block_throttle":true,
   "lifecycle_end_timeout_ms": 1800000,
   "note": "项目描述信息",
   "llm_error": {

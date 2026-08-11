@@ -4,6 +4,18 @@ All notable changes to CoordClaw are documented here.
 
 Versioning convention: the git tag always matches `controlpanel/web/package.json` version (e.g. `v2.9.0`). See that file for the current public version.
 
+## [2.10.1] - 2026-08-11
+
+### Added
+- **plugins/coordcenter · message-routing**: when a member fails to complete its current single task, automatically reduce the number of members woken up for dispatch, preventing the task from blocking on a specific member. This feature is toggleable via a `team.json` config switch.
+
+### Changed
+- **start.cjs**: refactored into a single isomorphic `BUILD_TARGETS` loop (plugin + web share scan/install/build primitives); `isSource` now explicitly excludes `.d.ts` to remove the latent "recompile every startup" loop if `declaration` output ever lands in the source tree; `runNpm` uses `shell: true` for reliable `npm.cmd` resolution on Windows and consistent `/bin/sh` on Linux/macOS; dropped an unused `version` constant.
+- **controlpanel/web**: skills handler (`skills.ts`), i18n strings (`i18n-strings.ts`), and chat UI (`index.html`, `app-main.js`, `api.js`) updates; public version bumped to `2.10.1`.
+- **plugins/coordcenter** (internal `19.60.0`): message-routing (`cache/manager.ts`, `dispatch.ts`, `state-machine.ts`), session-snapshot (`persistence.ts`, `snapshot-events.ts`), `environment.ts`, `shared/types.ts`, `index.ts`, and `openclaw.plugin.json` adjustments; added `shared/plugin-version.ts` and `scripts/`.
+- **docs**: refreshed README zh/en; added `HUSTAIL.png` diagram under `docs/readme_png/{zh,en}`.
+- **teamstemplate**: updated `team.json` for zh/en and their `CoordClawAITeam_*` variants.
+
 ## [2.10.0] - 2026-08-10
 
 ### Added

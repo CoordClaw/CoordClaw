@@ -1,6 +1,6 @@
 {
   "name": "@coordclaw/coordinationcenter",
-  "version": "19.50.0",
+  "version": "19.60.0",
   "type": "module",
   "engines": {
     "node": ">=22"
@@ -21,6 +21,7 @@
     }
   },
   "scripts": {
+    "prebuild": "node scripts/sync-manifest-version.mjs",
     "build": "tsc -p tsconfig.json && esbuild index.ts --bundle --platform=node --format=esm --outfile=dist/index.js --external:openclaw --external:@openclaw/*",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "test": "esbuild test/dispatch-queue.test.ts --bundle --platform=node --format=esm --outfile=test/.dispatch-queue.test.mjs && node test/.dispatch-queue.test.mjs"

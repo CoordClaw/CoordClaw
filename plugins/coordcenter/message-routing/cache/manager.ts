@@ -61,6 +61,7 @@ export async function initAgentActivityCache(members: any[]): Promise<void> {
         updatedAt: now,
         aborted: false,
         fixable: true,
+        completedNormally: true, // 新成员默认"未阻塞"，与 fixable 同列
         totalTokens: 0,
         totalToolCalls: 0,
         runs: [],
@@ -311,6 +312,7 @@ export function rebuildFromMembers(members: any[]): void {
       updatedAt: now,
       aborted: false,
       fixable: true,
+      completedNormally: true, // 新成员默认"未阻塞"，与 fixable 同列
       totalTokens: 0,
       totalToolCalls: 0,
       runs: [],

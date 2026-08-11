@@ -26,6 +26,7 @@ export function buildSnapshotRecord(record: any, opts?: { includeRuns?: boolean 
     roundIndex: record.roundIndex ?? 0,
     status: record.status,
     fixable: record.fixable ?? false,
+    completedNormally: record.completedNormally ?? true, // 随 fixable 同道推给其他设备，零新推送代码
     state: record.state,
     startedAt: record.startedAt ? String(record.startedAt) : null,
     endedAt: record.endedAt ? String(record.endedAt) : null,

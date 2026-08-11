@@ -143,17 +143,40 @@
                         const browseResp = await AppApi.getBrowseFolder(I18N.t('browse_skill_title'));
                         const browseData = await browseResp.json();
                         if (!browseData.path) return;
-                        const installResp = await AppApi.postInstallSkill(browseData.path);
-                        const result = await installResp.json();
-                        if (result.success) {
-                            SkillsModule.renderCardWithData(result.skills);
-                        } else {
-                            alert(I18N.err(result, '安装失败'));
-                        }
+                        await doInstall(browseData.path, false);
                     } catch (e) {
-                        alert(I18N.t('alert_open_fail'));
+                        alert(I18N.t('alert_open_fail') + (e && e.message ? '：' + e.message : ''));
                     }
                 });
+            }
+
+            // 安装技能核心流程（含同名覆盖确认 + 列表缓存刷新）
+            async function doInstall(sourcePath, force) {
+                try {
+                    const installResp = await AppApi.postInstallSkill(sourcePath, force);
+                    const result = await installResp.json();
+                    if (result.conflict) {
+                        // 同名 → 弹窗确认覆盖（复用 showModal 全局原语）
+                        const footerHtml =
+                            '<button onclick="window.closeModal()" style="background:var(--bg-primary);color:var(--text-primary);border:1px solid var(--border-color);border-radius:4px;padding:4px 12px;cursor:pointer;font-size:12px;margin-right:8px">' + I18N.t('modal_cancel') + '</button>'
+                          + '<button onclick="window.__skillInstallOverwrite()" style="background:var(--accent-blue);color:#fff;border:none;border-radius:4px;padding:4px 12px;cursor:pointer;font-size:12px">' + I18N.t('modal_confirm') + '</button>';
+                        window.__skillInstallOverwrite = () => {
+                            window.closeModal();
+                            doInstall(sourcePath, true);
+                        };
+                        window.showModal(I18N.t('skill_install_title'), I18N.tp('skill_install_overwrite_confirm', result.skillName), footerHtml);
+                        return;
+                    }
+                    if (result.success) {
+                        // H1: 破除 Gateway 30s 列表缓存 + 重渲染（使新技能立即出现）
+                        await AppApi.postRefreshSkills();
+                        await SkillsModule.renderCard();
+                        return;
+                    }
+                    alert(I18N.err(result, '安装失败'));
+                } catch (e) {
+                    alert(I18N.t('alert_open_fail') + (e && e.message ? '：' + e.message : ''));
+                }
             }
 
             const btnManagePlatforms = document.getElementById('btn-manage-platforms');

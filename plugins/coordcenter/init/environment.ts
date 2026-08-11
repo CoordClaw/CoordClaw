@@ -6,6 +6,7 @@
  */
 
 import { initLogger, applyLogConfig, LogLevel, cleanOldLogFiles, debug, info, warn, error, getEventId } from "../shared/logger";
+import { getPluginVersion } from "../shared/plugin-version";
 import { initDefaultPlaceholders } from "../shared/template";
 import { setConfigFallbackPaths, setUserDirFromRuntime, setCoordClawRoot, getCoordClawJsonPath, initPaths } from "../shared/paths";
 import { writeConfigJson } from "../shared/config-writer";
@@ -27,7 +28,7 @@ const DEFAULT_CACHE_TTL_MS = 60_000;
 export function initEnvironment(api: any): BootContext {
   // ---- Logger ----
   initLogger(api);
-  const PLUGIN_VERSION = 'v19.50';
+  const PLUGIN_VERSION = getPluginVersion();
   api.logger.info(`[PLUGIN] version=${PLUGIN_VERSION} loaded, pid=${process.pid}`);
   debug('plugin', `[INIT] register() ENTRY, api keys=[${Object.keys(api).join(",")}]`, getEventId());
   debug('plugin', `[INIT] api.runtime keys=[${Object.keys(api.runtime || {}).join(",")}]`, getEventId());

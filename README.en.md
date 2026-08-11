@@ -1,4 +1,5 @@
-> This is the English mirror of [README.md](./README.md) (中文).
+[English](./README.en.md) | [中文](./README.md) 
+![Huazhong University of Science and Technology AI Lab](docs/readme_png/en/HUSTAIL.png)<p align="center">[Huazhong University of Science and Technology AI Lab](https://aia.hust.edu.cn/)</p>
 
 # CoordClaw Multi-Agent Collaboration System · A Real One-Person-Company AI Team
 

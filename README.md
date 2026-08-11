@@ -1,4 +1,5 @@
-[English](./README.en.md) | [中文](./README.md)
+[English](./README.en.md) | [中文](./README.md) 
+![华中科技大学人工智能实验室](docs/readme_png/zh/HUSTAIL.png)<p align="center">[华中科技大学人工智能实验室](https://aia.hust.edu.cn/)</p>
 
 # CoordClaw 多智能体协作系统 · 真·一人公司 AI 团队
 

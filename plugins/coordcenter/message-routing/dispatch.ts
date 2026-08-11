@@ -1,4 +1,4 @@
-import { getEventId, error } from "../shared/logger";
+import { getEventId, error, debug } from "../shared/logger";
 import { writeSnapshotFile } from "../session-snapshot/persistence";
 import { isCheckEnabled } from "../shared/message-picker";
 import { shouldDispatchNotification, recordDispatch } from "./dispatcher/rate-limiter";
@@ -48,6 +48,22 @@ export async function loadTeamData() {
   _cachedLoadTeamResult = { projectRoot, teamData };
   _cachedLoadTeamTime = now;
   return _cachedLoadTeamResult;
+}
+
+// 白名单统一真相源：仅 team.json 中该成员的 canonical sessionKey 才放行。
+// 用于信号层入口门禁（transitionToProcessing / transitionToEnded），从根阻止 :heartbeat 等外来 key 污染缓存与路由。
+// 未配置 sessionKey 的成员视为放行（兼容旧配置）；命中不匹配时打 debug 日志。
+export async function isSessionKeyWhitelisted(agentId: string, sessionKey: string): Promise<boolean> {
+  if (!agentId || !sessionKey) return false;
+  const { teamData } = await loadTeamData();
+  const member = getMemberByAgentId(teamData.members || [], agentId);
+  if (!member) return false;
+  const expected = member.sessionKey as string | undefined;
+  if (expected && expected !== sessionKey) {
+    debug('message-routing', `[SESSION] ${member.name || agentId}(${agentId}) sessionKey不匹配: 期望=${expected.slice(0, 50)} 实际=${sessionKey.slice(0, 50)}，跳过 | ${sessionKey}`, getEventId());
+    return false;
+  }
+  return true;
 }
 
 export type DispatchActionType = 'msg1' | 'msg2' | 't7' | 'msg5' | 'skip';

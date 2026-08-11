@@ -18,7 +18,7 @@ import {
   globalLlmState,
 } from "./internal-state";
 import {
-  getMemberByAgentId,
+  isSessionKeyWhitelisted,
   isMember,
   isPM,
   loadTeamData,
@@ -57,18 +57,8 @@ function getEarliestUnreadAt(receivedUnreadMessages: { created_at: string }[]): 
 
 // ==================== 状态转换 ====================
 export async function transitionToProcessing(sessionKey: string, agentId: string, source: string, runId?: string) {
-  // 白名单前置：先检查成员和 sessionKey，通过后才操作 cache
-  const member = getMemberByAgentId(
-    (await loadTeamData()).teamData.members || [],
-    agentId,
-  );
-  if (!member) return;
-
-  const expectedSessionKey = member.sessionKey as string | undefined;
-  if (expectedSessionKey && sessionKey !== expectedSessionKey) {
-    debug('message-routing', `[SESSION] ${member.name || agentId}(${agentId}) sessionKey不匹配: 期望=${expectedSessionKey.slice(0, 50)} 实际=${sessionKey.slice(0, 50)}，跳过 (source=${source}) | ${sessionKey}`, getEventId());
-    return;
-  }
+  // 白名单前置（统一真相源）：仅 whitelist 内的 canonical sessionKey 才操作 cache
+  if (!(await isSessionKeyWhitelisted(agentId, sessionKey))) return;
 
   const cached = await ensureCacheEntry(agentId, sessionKey);
   if (!cached) return;
@@ -77,16 +67,13 @@ export async function transitionToProcessing(sessionKey: string, agentId: string
 }
 
 export async function transitionToEnded(sessionKey: string, agentId: string, source: string, runId?: string, endedAt?: number) {
+  // 白名单前置（统一真相源）：仅 whitelist 内的 canonical sessionKey 才触发信号层监控（防止 :heartbeat 等外来 key 污染缓存）
+  if (!(await isSessionKeyWhitelisted(agentId, sessionKey))) return;
+
   const cached = sessionActivityCache.get(sessionKey);
   if (!cached) {
     await ensureCacheEntry(agentId, sessionKey);
   }
-
-  const member = getMemberByAgentId(
-    (await loadTeamData()).teamData.members || [],
-    agentId,
-  );
-  if (!member) return;
 
   await updateStatus(sessionKey, 'ended', source, endedAt);
   clearSignals(sessionKey);
@@ -343,11 +330,42 @@ export async function executeMessageRouting(sessionKey: string, source: string):
     // msg5(abort 通知) 已并入 buildDispatchAction 统一判定(仅被 abort 的 trigger 自处理),
     // 不再在此独立循环 scoop 他人 abort。详见 dispatch.ts buildDispatchAction 顶部分支。
 
+    // 全局管线: 状态计算→pendingList(全员,含 RUNNING→skip)→[此处边沿写 completedNormally]→
+    // buildDispatchQueue(剔除 skip/RUNNING = 唤醒名单)→容量层(anyBlocked/suppress)→sendList。
+    // completedNormally 唯一消费者=容量层 anyBlocked, 提供"谁是阻塞 trigger"的跨轮记忆。
+    // 顶层规则(rec.status 实际仅 'processing'|'ended' 两态: 'error' 是死类型, 类型在 types.ts:36 但从未赋值,
+    //   仅 updateStatus 传 'processing'(:76) 与 'ended'(:91))：
+    //  - running(processing): 本轮无决议 → 保持上轮值(不碰); 即"唤醒名单剔除 RUNNING"在标记层的体现
+    //  - ended(已决议终态, 含 COMPLETED_WITH_GROUPCHAT): 一律赋值 → t7(blocksReset)→false(阻塞), 其余→true(正常完成)
+    //  必须 loop 全员(pendingList) 而非仅唤醒名单(dispatchQueue): 后者剔除 COMPLETED_WITH_GROUPCHAT,
+    //  会漏翻"t7→完成"成员的 true, 致 anyBlocked 永久 true。RUNNING 靠"不决议=不碰"自然剥离, 非缩小循环。
+    for (const item of pendingList) {
+      const rec = getSessionRecordBySessionKey(item.ctxObj.sessionKey);
+      if (!rec) continue;
+      if (rec.status === 'processing') {
+        debug('message-routing', `[THROTTLE][${chainId}] 标记跳过 | ${item.agentName}(${item.agentId}) status=processing(running) 保持上轮值=${rec.completedNormally}`, getEventId());
+        continue;                                           // running: 本轮无决议 → 保持上轮值
+      }
+      rec.completedNormally = item.blocksReset !== true;    // ended: t7→false(阻塞) 否则→true(正常完成)
+      debug('message-routing', `[THROTTLE][${chainId}] 标记 | ${item.agentName}(${item.agentId}) blocksReset=${item.blocksReset} → completedNormally=${rec.completedNormally}`, getEventId());
+    }
+
     // 解耦: 分桶拼接 + 仅 msg1 内排序。skip 直接丢弃, 绝不进排序(消除非传递比较器污染)。
     const dispatchQueue = buildDispatchQueue(pendingList);
 
     // 状态驱动 auto-reset 门控信号：trigger 本轮回需发 t7（未完成/需群聊反馈）→ 不 reset
     triggerNeedsT7 = needsT7ResetGate(dispatchQueue);
+
+    // 节流开关(team.json opt-in, 随 loadTeamData 缓存链加载/过期): 仅显式 auto_block_throttle===true 才启用；默认关，零行为变更。
+    const throttleEnabled = teamData?.auto_block_throttle === true;
+    // 容量层聚合: 任意成员上轮未完成(completedNormally===false)即视为有阻塞。读 cache 标记(跨轮持久)，
+    // 可捕获"本轮 RUNNING 被掩盖但上轮确已阻塞"的有界盲区成员。
+    const anyBlocked = pendingList.some((e) => {
+      const rec = getSessionRecordBySessionKey(e.ctxObj.sessionKey);
+      return rec ? rec.completedNormally === false : false; // undefined→false(不计阻塞); 严格 ===false 防误触发
+    });
+    const suppress = throttleEnabled && anyBlocked;
+    debug('message-routing', `[THROTTLE][${chainId}] 判定 | enabled=${throttleEnabled} anyBlocked=${anyBlocked} suppress=${suppress}`, getEventId());
 
     info('message-routing', `[ROUTING] [${chainId}] ===== Phase 2: 乐观标记 (最多 ${maxActivations}) =====`, getEventId());
 
@@ -367,6 +385,10 @@ export async function executeMessageRouting(sessionKey: string, source: string):
     let triggerSelfTargeted = false;
     let hasBlockedCandidate = false;
     for (const item of dispatchQueue) {
+      if (suppress && item.blocksReset !== true) {
+        debug('message-routing', `[THROTTLE][${chainId}] 压制 | ${item.agentName}(${item.agentId}) ${item.actionLabel} 因存在阻塞trigger被节流(仅放行t7自身)`, getEventId());
+        continue; // 节流: 开关开+有阻塞→仅放行阻塞成员自身 t7，压制其余全部唤醒(含msg2)
+      }
       if (item.actionType !== 'msg5' && markCount >= effectiveMax) {
         hasBlockedCandidate = true;
         info('message-routing', `[ROUTING] [${chainId}] MARK-LIMIT | ${item.agentName}(${item.agentId}) 超出上限(${markCount}/${effectiveMax}) 状态=${item.mState.state} → 不标记不发送`, getEventId());
@@ -402,6 +424,10 @@ export async function executeMessageRouting(sessionKey: string, source: string):
         .some(r => r.fixable === true && r.status === 'processing');
       if (!hasRunner) {
         for (const item of dispatchQueue) {
+          if (suppress && item.blocksReset !== true) {
+            debug('message-routing', `[THROTTLE][${chainId}] 压制(keeper) | ${item.agentName}(${item.agentId}) ${item.actionLabel} 因存在阻塞trigger被节流(仅放行t7自身)`, getEventId());
+            continue; // 与主循环同谓词，极端满并发下节流一致
+          }
           if (item.actionType === 'skip' || item.actionType === 'msg5') continue;
           const prevStatus = getSessionRecordBySessionKey(item.ctxObj.sessionKey)?.status || '?';
           if (prevStatus !== 'ended') continue;

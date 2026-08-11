@@ -67,6 +67,7 @@ export function writeSnapshotFile(sessionKey: string): void {
       roundIndex: record.roundIndex,
       status: record.status,
       fixable: record.fixable ?? false,
+      completedNormally: record.completedNormally ?? true, // 与 fixable 完全同路径
       state: record.state,
       startedAt: toUtcIso(record.startedAt),
       endedAt: toUtcIso(record.endedAt),
