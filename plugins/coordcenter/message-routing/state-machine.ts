@@ -79,6 +79,20 @@ export async function transitionToEnded(sessionKey: string, agentId: string, sou
   clearSignals(sessionKey);
 }
 
+// ==================== 路由阻断判据（统一复用） ====================
+// 全局 LLM 错误置真时，除非 force-route 显式穿透，否则不路由（含 auto-reset）。
+// 抽出单一真相源，供 updateStatus 入口与 executeMessageRouting 入口共用，消除两处不一致。
+function isRoutingBlocked(source: string): boolean {
+  return globalLlmState.error && !source.startsWith("force-route");
+}
+
+// force-route（人类手动重评估 pass）不产生 agent 生命周期语义（不阻塞、不 reset）：
+// 其触发态不应产出 NEEDS_GROUPCHAT_FEEDBACK（t7）。与 isRoutingBlocked 同风格、正交——
+// 前者管"是否路由"，本函数管"是否允许 t7"，二者均按 source 前缀判定。
+function isT7Suppressed(source: string): boolean {
+  return source.startsWith("force-route");
+}
+
 // ==================== updateStatus ====================
 async function updateStatus(sessionKey: string, status: string, source: string, endedAt?: number): Promise<boolean> {
   const cached = sessionActivityCache.get(sessionKey);
@@ -94,7 +108,7 @@ async function updateStatus(sessionKey: string, status: string, source: string, 
   cached.updatedAt = new Date().toISOString();
   writeSnapshotFile(sessionKey);
 
-  if (oldStatus === 'processing' && status === 'ended' && source !== 'llm_error') {
+  if (oldStatus === 'processing' && status === 'ended' && !isRoutingBlocked(source)) {
     try {
       const { teamData } = await loadTeamData();
       const msgRobotEnabled = teamData.msg_robot !== false && teamData.msg_robot !== "false";
@@ -126,7 +140,7 @@ async function updateStatus(sessionKey: string, status: string, source: string, 
 
 // ==================== 消息路由 ====================
 export async function executeMessageRouting(sessionKey: string, source: string): Promise<{ triggerNeedsT7: boolean } | undefined> {
-  if (globalLlmState.error && !source.startsWith("force-route")) {
+  if (isRoutingBlocked(source)) {
     info('message-routing', `[ROUTING] BLOCKED | global LLM error flag set (source=${source})`, getEventId());
     return;
   }
@@ -201,6 +215,7 @@ export async function executeMessageRouting(sessionKey: string, source: string):
             triggerStartedAt,
             triggerEndedAt,
             sessionKey,
+            !isT7Suppressed(source),
           );
           memberStates.set(mAgentId, {
             sessionKey,

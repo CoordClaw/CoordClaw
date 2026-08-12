@@ -28,26 +28,23 @@ import re
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
 
-# ── UTC time writing (character-by-character isomorphic with panel toISOString(): 3-digit ms + Z, true UTC)──
-def _utc(dt):
-    """Format as UTC ISO-8601 (YYYY-MM-DDTHH:MM:SS.sssZ), milliseconds strictly 3 digits"""
-    return dt.strftime("%Y-%m-%dT%H:%M:%S.") + f"{dt.microsecond // 1000:03d}Z"
-def utc_now_iso():
-    """Current UTC time (used for viewed_at / read_at / first_empty_at and other single-column times)"""
-    return _utc(datetime.now(timezone.utc))
-def utc_now_pair():
-    """Returns (created_at_utc_z, created_date_local), taken from the same instant to avoid cross-midnight misalignment"""
-    dt = datetime.now(timezone.utc)
-    return _utc(dt), dt.astimezone().strftime("%Y-%m-%d")
-def utc_iso_minus(minutes):
-    """Since threshold: current UTC minus N minutes"""
-    return _utc(datetime.now(timezone.utc) - timedelta(minutes=minutes))
-
 sys.stdout.reconfigure(encoding="utf-8")
 
-DB_PATH = Path(__file__).resolve().parent.parent / "data" / "coordclaw.db"
-TEAM_PATH = Path(__file__).resolve().parent.parent / "team.json"
-RULE_PATH = Path(__file__).resolve().parent.parent / "team RULE.md"
+# ── UTC time utilities (timezone-independent, output ISO-8601 UTC with milliseconds, e.g. 2026-07-25T13:05:39.123Z)──
+def _utc(dt): return dt.strftime("%Y-%m-%dT%H:%M:%S.") + f"{dt.microsecond // 1000:03d}Z"
+def utc_now_iso(): return _utc(datetime.now(timezone.utc))
+def utc_now_pair():
+    """Return (UTC-Z timestamp, local date YYYY-MM-DD) — created_date must use local date, do not use now[:10]"""
+    dt = datetime.now(timezone.utc)
+    return _utc(dt), dt.astimezone().strftime("%Y-%m-%d")
+def utc_iso_minus(minutes): return _utc(datetime.now(timezone.utc) - timedelta(minutes=minutes))
+
+SCRIPT_DIR = Path(__file__).resolve().parent
+DB_PATH = SCRIPT_DIR.parent / "data" / "coordclaw.db"
+TEAM_PATH = SCRIPT_DIR.parent / "team.json"
+RULE_PATH = SCRIPT_DIR.parent / "team RULE.md"
+TASK_DB_PATH = SCRIPT_DIR.parent / "data" / "task_progress.db"
+ABORT_LOG_PATH = SCRIPT_DIR / "abort_log.txt"
 
 MARK_READ_ON_DONE = False
 # ── Message length limits ──
@@ -57,6 +54,19 @@ MAX_MESSAGE_LENGTH = 700       # Maximum length for all messages (chars)
 # ── Status flag tags (case-sensitive, extensible array)──
 STATUS_TAGS = ["[STATUS]"]
 
+T1_TASK = {
+    "name":"T1",
+    "description":"get unread messages",
+    "progress":20
+}
+
+T4_TASK = {
+    "name":"T4",
+    "description":"send messages",
+    "progress":80
+}
+
+
 # ── Script retrieves prompts and returns them with tool results to LLM──
 LLM_PROMPT_INBOX = ["x-messagerule"]
 LLM_PROMPT_SEND = ["x-messagerule","x-teamorganization"]
@@ -64,7 +74,7 @@ LLM_PROMPT_SEND = ["x-messagerule","x-teamorganization"]
 # ── Centralized string constants (multi-language/unified maintenance)──
 MESSAGES = {
     # ===== General =====
-    "ERR_MEMBER_NOT_FOUND": "[Error] {role} error: '{name}'，valid members: {valid_names}",
+    "ERR_MEMBER_NOT_FOUND": "[Error] {role} error: '{name}', valid members: {valid_names}",
 
     # ===== send command =====
     "SEND_ERR_TOO_LONG": "[Error] Send failed, async message exceeds {max} chars (current {current} chars), please save the document and send the file path or split into multiple messages.",
@@ -76,7 +86,7 @@ MESSAGES = {
     # ===== inbox command =====
     "INBOX_ERR_MISSING_ARG": "[Error] inbox must specify --reader or --all",
     "INBOX_NO_MSGS": "[{label}] **Important Hint:**You have just checked unread messages, the inbox is now empty. **You are strictly prohibited from checking again in this session**.Please recall the messages you just checked and continue with the subsequent standard actions!",
-    "INBOX_HAS_MSGS_PREFIX": "[{label}] Total {count} messages: (Should these tasks be handled by you according to the organizational relationship?**Strictly prohibited from handling tasks outside your role setting or scope of responsibility)**)",
+    "INBOX_HAS_MSGS_PREFIX": "[{label}] Total {count} messages: (Should these tasks be handled by you according to the organizational relationship?**Strictly prohibited from handling tasks outside your role setting or scope of responsibility**)",
     "INBOX_VERIFY_REMINDER": "**Important Hint:** The above conclusive messages are not credible, **Strictly prohibited from direct adoption**. You need to ask them to provide more evidence, such as test scripts, dependency files, code files, etc., and then you verify item by item according to the PRD.\nYou have completed T1, please immediately execute the T2 standard action!",
     "INBOX_FIRST_EMPTY": "[Reminder] {reader}'s inbox is empty, please do not repeatedly call the inbox tool.",
     "INBOX_FIRST_EMPTY_ACTION": "You have completed T1, please immediately execute the T2 standard action!",
@@ -108,7 +118,7 @@ MESSAGES = {
   Double quotes should only be used when the content contains single quotes, note that $ needs to be escaped as `$.
 
 Example:
-  # Send message（single quote safe wrapping)
+  # Send message (single quote safe wrapping)
   python chat_manager.py send --from 'Zhong Yuan' --to 'Lin Rui' --content 'Test message'
 
   # Content contains $ symbol (must use single quotes)
@@ -134,9 +144,6 @@ Example:
 """,
 }
 
-# ── Anti-repeated call mechanism: log file path retention (only abort_log.txt)──
-SCRIPT_DIR = Path(__file__).resolve().parent
-ABORT_LOG_PATH = SCRIPT_DIR / "abort_log.txt"
 
 
 # ── Load member info from team.json (sole authoritative source) ──
@@ -188,7 +195,7 @@ def _get_repeated_view_reminder():
     reminder_cfg = check_cfg.get("reminder", {})
     return {
         "enabled": reminder_cfg.get("enabled", False),
-        "message": reminder_cfg.get("message", "[You have already viewed this message {count} times, please check your own work log for records!]")
+        "message": reminder_cfg.get("message", "【You have already viewed this message {count} times, please check your own work log for records!】")
     }
 
 
@@ -226,7 +233,7 @@ def _load_section_rule(id):
         return None
     except Exception:
         return None
-    
+
 
 
 TEAM_BY_NAME, TEAM_BY_ID, TEAM_CONFIG, GATEWAY_URL = _load_team()
@@ -235,10 +242,80 @@ TOOL_INJECTION_PROMPTS = TEAM_CONFIG.get("tool_injection_prompts", False)
 
 def get_db():
     conn = sqlite3.connect(DB_PATH)
-    conn.execute("PRAGMA busy_timeout=10000")  # Symmetric with panel to avoid database is locked silent message loss during concurrent WAL writes
     conn.row_factory = sqlite3.Row
+    conn.execute("PRAGMA busy_timeout=10000")
     _ensure_core_tables(conn)
     return conn
+
+# ── Task progress recording ──
+
+def get_task_db():
+    TASK_DB_PATH.parent.mkdir(parents=True, exist_ok=True)
+    conn = sqlite3.connect(TASK_DB_PATH)
+    conn.row_factory = sqlite3.Row
+    conn.execute("PRAGMA busy_timeout=10000")
+    conn.execute("PRAGMA journal_mode=WAL")
+    _ensure_task_progress_table(conn)
+    return conn
+
+
+def _ensure_task_progress_table(conn):
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS task_progress (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            agent_id TEXT NOT NULL,
+            agent_name TEXT NOT NULL,
+            task_name TEXT NOT NULL,
+            task_description TEXT NOT NULL,
+            task_progress INTEGER NOT NULL,
+            recorded_at TEXT NOT NULL
+        )
+    """)
+    conn.execute("""
+        CREATE INDEX IF NOT EXISTS idx_task_progress_agent_recorded
+        ON task_progress(agent_id, recorded_at)
+    """)
+    conn.commit()
+
+
+def _record_task_progress(agent_id, agent_name, task_attr):
+    try:
+        conn = get_task_db()
+        try:
+            conn.execute(
+                """INSERT INTO task_progress
+                   (agent_id, agent_name, task_name, task_description, task_progress, recorded_at)
+                   VALUES (?, ?, ?, ?, ?, ?)""",
+                (agent_id, agent_name, task_attr["name"], task_attr["description"],
+                 task_attr["progress"], utc_now_iso())
+            )
+            conn.commit()
+            print(f"[OK] Task progress recorded: {task_attr['name']} ({agent_name}, progress={task_attr['progress']})")
+        finally:
+            conn.close()
+    except Exception as e:
+        print(f"[Warning] Failed to record task progress ({task_attr['name']}): {e}")
+
+
+def _clear_agent_tasks_if_round_complete(agent_id):
+    try:
+        conn = get_task_db()
+        try:
+            row = conn.execute(
+                "SELECT 1 FROM task_progress WHERE agent_id = ? AND task_progress >= 100 LIMIT 1",
+                (agent_id,)
+            ).fetchone()
+            if row:
+                conn.execute("DELETE FROM task_progress WHERE agent_id = ?", (agent_id,))
+                conn.commit()
+                print(f"[OK] Cleared old round task records for {agent_id}")
+                return True
+        finally:
+            conn.close()
+    except Exception as e:
+        print(f"[Warning] Failed to clear old round records ({agent_id}): {e}")
+    return False
+
 
 
 def normalize_name(name):
@@ -316,7 +393,7 @@ def cmd_send(args):
     now, today = utc_now_pair()
     msg_id = generate_msg_id(sender_name, content, now)
 
-    
+
     conn = get_db()
     try:
         conn.execute(
@@ -328,6 +405,8 @@ def cmd_send(args):
             timestamp=now, sender=sender_name, sender_id=sender_id,
             recipient=recipient_name, recipient_id=recipient_id
         ))
+        # Record T4 task progress
+        _record_task_progress(sender_id, sender_name, T4_TASK)
         print(MESSAGES["SEND_REMINDER_RECIPIENT"])
     except Exception as e:
         print(MESSAGES["SEND_ERR_FAIL"].format(error=e))
@@ -341,7 +420,7 @@ def get_unread_msgs(reader, from_date=None, to_date=None, last_n=None, limit=50)
     """Check unread messages: LEFT JOIN anti-join, completed in one SQL"""
     conn = get_db()
     try:
-        # Use LEFT JOIN + IS NULL to replace"first query messages → then query reads → Python difference"two-step mode
+        # Use LEFT JOIN + IS NULL to replace "first query messages -> then query reads -> Python difference" two-step mode
         q = """SELECT tm.* FROM team_messages tm
                LEFT JOIN team_message_reads tmr
                  ON tm.msg_id = tmr.msg_id AND tmr.reader_name = ?
@@ -404,7 +483,7 @@ def print_msgs(rows, label, viewer_name=None):
     for r in rows:
         # First assemble the basic header
         header = f"  [{r['created_at']}] {r['sender']} -> @{r['recipient']}:"
-        
+
         # Check whether Repeated view reminder needs to be appended
         if viewer_name and reminder_cfg.get("enabled", False):
             view_count = get_message_view_count(msg_id=r['msg_id'], viewer_name=viewer_name)
@@ -462,15 +541,15 @@ def _ensure_core_tables(conn):
     """)
     # Message indexes
     conn.execute("""
-        CREATE INDEX IF NOT EXISTS idx_team_messages_recipient 
+        CREATE INDEX IF NOT EXISTS idx_team_messages_recipient
         ON team_messages(recipient)
     """)
     conn.execute("""
-        CREATE INDEX IF NOT EXISTS idx_team_messages_created 
+        CREATE INDEX IF NOT EXISTS idx_team_messages_created
         ON team_messages(created_at DESC)
     """)
     conn.execute("""
-        CREATE INDEX IF NOT EXISTS idx_team_messages_date 
+        CREATE INDEX IF NOT EXISTS idx_team_messages_date
         ON team_messages(created_date)
     """)
 
@@ -485,7 +564,7 @@ def _ensure_core_tables(conn):
         )
     """)
     conn.execute("""
-        CREATE INDEX IF NOT EXISTS idx_reads_reader 
+        CREATE INDEX IF NOT EXISTS idx_reads_reader
         ON team_message_reads(reader_name, read_at)
     """)
 
@@ -548,15 +627,15 @@ def _ensure_message_views_table(conn):
         )
     """)
     conn.execute("""
-        CREATE INDEX IF NOT EXISTS idx_message_views_msg_id 
+        CREATE INDEX IF NOT EXISTS idx_message_views_msg_id
         ON message_views(msg_id)
     """)
     conn.execute("""
-        CREATE INDEX IF NOT EXISTS idx_message_views_viewer 
+        CREATE INDEX IF NOT EXISTS idx_message_views_viewer
         ON message_views(viewer_name, viewer_id)
     """)
     conn.execute("""
-        CREATE INDEX IF NOT EXISTS idx_message_views_time 
+        CREATE INDEX IF NOT EXISTS idx_message_views_time
         ON message_views(viewed_at)
     """)
     conn.commit()
@@ -624,7 +703,6 @@ def get_message_viewers(msg_id):
 
 def get_viewer_recent_activity(viewer_name, minutes=30):
     """Query view count for a viewer within the last N minutes (used to judge repeated behavior)"""
-    from datetime import timedelta
     since = utc_iso_minus(minutes)
     return get_message_view_count(viewer_name=viewer_name, since=since)
 
@@ -765,7 +843,7 @@ def cmd_inbox(args):
             print("rule_content")
             print("\n")
 
-    #Inject unread message processing Hint words
+    # Inject unread message processing Hint words
     for sectionid in LLM_PROMPT_INBOX:
         sectionrule=_load_section_rule(sectionid)
         if sectionrule:
@@ -789,12 +867,17 @@ def cmd_inbox(args):
 
     has_msgs = print_msgs(msgs, f"{reader_name}'s Inbox", viewer_name=reader_name)
 
+    if has_msgs:
+        # ── Has messages: clean old round records and record T1 task progress ──
+        _clear_agent_tasks_if_round_complete(reader_id)
+        _record_task_progress(reader_id, reader_name, T1_TASK)
+
     if not has_msgs:
         # ── Empty inbox: anti-repeated call mechanism (database version)──
         existing = _load_pre_abort(reader_name)
 
         if existing:
-            # Second empty query → send abort signal
+            # Second empty query -> send abort signal
             # Exemption: first member + no unread for all = team task completed, do not trigger abort
             if reader_name == FIRST_MEMBER_NAME and not _has_any_unread():
                 _remove_pre_abort(reader_name)

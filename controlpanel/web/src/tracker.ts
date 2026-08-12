@@ -5,7 +5,7 @@ import { request as httpsRequest, get as httpsGet } from 'node:https';
 import { request as httpRequest, get as httpGetRaw } from 'node:http';
 import { randomUUID } from 'node:crypto';
 
-import { readCoordClawJson, COORDCLAW_CONFIG_PATH, getOpenClawUserDir } from './config-resolver.js';
+import { readCoordClawJson, COORDCLAW_CONFIG_PATH, getOpenClawUserDir, PKG_VERSION } from './config-resolver.js';
 import { joinStatic } from './lib/paths.js';
 
 // ============ 常量 ============
@@ -36,7 +36,7 @@ function getCoordClawMeta() {
   try {
     const c = readCoordClawJson();
     return {
-      version: c.version || 'unknown',
+      version: PKG_VERSION,
       runtime: (c as any).runtime || 'node',
       platform: (c as any).platform || 'CoordClaw',
       language: c.language || 'zh',

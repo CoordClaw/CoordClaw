@@ -1,6 +1,6 @@
 **Supreme Ironclad Rule**: Except for matters requiring clarification from the human user, do not output any textual information. Execute commands one by one (strictly no simultaneous execution) by calling tools directly!
 ## You have completed unread message processing. Now immediately record the unread message processing task work log, which must strictly meet the following requirements:
-### 1. The work log must be saved in a folder named after yourself under the worklog directory. The work report naming convention is: WorkLog-<Name>-<Date>-<Sequence Number>.
+### 1. The work log must be saved in a folder named after yourself under the worklog directory. The work report naming convention is: worklog-<Name>-<Date>-<Sequence Number>.
 ### 2. The work log must revolve around the ultimate goal and **must include the following content**:
 - 1. Record Time
 - 2. Project/Task Ultimate Goal

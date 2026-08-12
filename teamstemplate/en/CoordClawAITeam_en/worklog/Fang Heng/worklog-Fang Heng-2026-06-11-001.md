@@ -1,6 +1,6 @@
 # When you read this work log, it indicates the start of a new task. After each message/task is completed, a work log must be written. You must complete subsequent tasks based on the work log with the latest date. The work log must revolve around the ultimate goal and must include the following:
 ## 1. Record Time
-## 2. Project/Task Ultimate Goal
+## 2. Project/Task Ultimate Goal(Sub-goals are strictly prohibited and must be consistent with the PRD document)
 ## 3. Self-Review of Deviation from Ultimate Goal, Corrective Measures, and Reflection
 ## 4. Project/Task Summary (must be linked to the ultimate goal)
 ## 5. Project/Task Current Phase (must be linked to the ultimate goal)

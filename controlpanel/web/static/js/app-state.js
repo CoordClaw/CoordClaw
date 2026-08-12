@@ -228,6 +228,7 @@ function appState() {
     // 状态指示
     sseStatus: 'disconnected',
     gatewayStatus: 'disconnected',
+    version: '',
 
     // 滚动状态（Phase 4）
     isScrolledUp: false,

@@ -2,19 +2,20 @@
 # -*- coding: utf-8 -*-
 """
 task_done.py - Agent Task Completion Signal Sender
+**This code must not be modified by the agent itself**
 
-Command Arguments:
+Command arguments:
 - --name : The agent's own name (matched from team.json)
 
 Features:
-1. Reads gatewayUrl and member information from team.json
-2. Matches the corresponding member based on --name, extracts sessionKey
-3. Checks whether work log content is complete (if a template exists)
-4. If MARK_READ_ON_DONE is True, marks all unread messages for this member as read
-5. Checks unread message status for all members; enables msg_robot and refreshes cache when conditions are met
-6. Cleans up files and directories older than 2 hours in the temp directory (same level as worklog)
-7. Sends an abort signal to the session-abort-debug endpoint
-8. Outputs the sending result
+1. Read gatewayUrl and member info from team.json
+2. Match the corresponding member by --name and extract sessionKey
+3. Check whether the work log content is complete (if a template exists)
+4. If MARK_READ_ON_DONE is True, mark all unread messages for this member as read
+5. Check all-member unread status; enable msg_robot and refresh cache when conditions are met
+6. Clean up files and directories older than 2 hours in the temp directory (same level as worklog)
+7. Send an abort signal to the session-abort-debug endpoint
+8. Output the sending result
 
 Author: Dai Kexing (based on chat_manager.py v5.4.3)
 Version: v1.4.0 (2026-07-16)
@@ -32,34 +33,32 @@ import shutil
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
 
-# ── UTC time writing (character-by-character isomorphic with panel toISOString(): 3-digit ms + Z, true UTC)──
-def _utc(dt):
-    """Format as UTC ISO-8601 (YYYY-MM-DDTHH:MM:SS.sssZ), milliseconds strictly 3 digits"""
-    return dt.strftime("%Y-%m-%dT%H:%M:%S.") + f"{dt.microsecond // 1000:03d}Z"
-def utc_now_iso():
-    """Current UTC time (used for read_at / JSON timestamp and other single-column times)"""
-    return _utc(datetime.now(timezone.utc))
-def utc_now_pair():
-    """Returns (created_at_utc_z, created_date_local), taken from the same instant"""
-    dt = datetime.now(timezone.utc)
-    return _utc(dt), dt.astimezone().strftime("%Y-%m-%d")
-def utc_iso_minus(minutes):
-    """Since threshold: current UTC minus N minutes"""
-    return _utc(datetime.now(timezone.utc) - timedelta(minutes=minutes))
-
 sys.stdout.reconfigure(encoding="utf-8")
 
-# ── Feature Switch: Automatically mark unread messages as read upon task completion ──
+# ── UTC time utilities (timezone-independent, output ISO-8601 UTC with milliseconds, e.g. 2026-07-25T13:05:39.123Z)──
+def _utc(dt): return dt.strftime("%Y-%m-%dT%H:%M:%S.") + f"{dt.microsecond // 1000:03d}Z"
+def utc_now_iso(): return _utc(datetime.now(timezone.utc))
+def utc_now_pair():
+    """Return (UTC-Z timestamp, local date YYYY-MM-DD) — created_date must use local date, do not use now[:10]"""
+    dt = datetime.now(timezone.utc)
+    return _utc(dt), dt.astimezone().strftime("%Y-%m-%d")
+def utc_iso_minus(minutes): return _utc(datetime.now(timezone.utc) - timedelta(minutes=minutes))
+
+# ── Feature switch: automatically mark unread messages as read upon task completion ──
 # Set to True to enable, set to False to disable
 MARK_READ_ON_DONE = True
-CLEANUP_TEMP=False
+CLEANUP_TEMP = False
 
-# ── Path Configuration ──
+# ── Path configuration ──
 SCRIPT_DIR = Path(__file__).resolve().parent
 TEAM_PATH = SCRIPT_DIR.parent / "team.json"
 DB_PATH = SCRIPT_DIR.parent / "data" / "coordclaw.db"
+TASK_DB_PATH = SCRIPT_DIR.parent / "data" / "task_progress.db"
 
-# ── Centralized String Constants ──
+# ── Task progress constant ──
+T5_TASK = {"name": "T5", "description": "complete task", "progress": 100}
+
+# ── Centralized string constants ──
 MESSAGES = {
     "ERR_TEAM_NOT_FOUND": "[Error] team.json not found: {path}",
     "ERR_TEAM_PARSE": "[Error] Failed to parse team.json: {error}",
@@ -89,7 +88,7 @@ MESSAGES = {
 }
 
 
-# ── Database Connection ──
+# ── Database connection ──
 
 def get_db():
     conn = sqlite3.connect(DB_PATH)
@@ -98,10 +97,60 @@ def get_db():
     return conn
 
 
-# ── Load Member Information from team.json ──
+# ── Task progress recording (reusing chat_manager.py pattern) ──
+
+def get_task_db():
+    TASK_DB_PATH.parent.mkdir(parents=True, exist_ok=True)
+    conn = sqlite3.connect(TASK_DB_PATH)
+    conn.row_factory = sqlite3.Row
+    conn.execute("PRAGMA busy_timeout=10000")
+    conn.execute("PRAGMA journal_mode=WAL")
+    _ensure_task_progress_table(conn)
+    return conn
+
+
+def _ensure_task_progress_table(conn):
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS task_progress (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            agent_id TEXT NOT NULL,
+            agent_name TEXT NOT NULL,
+            task_name TEXT NOT NULL,
+            task_description TEXT NOT NULL,
+            task_progress INTEGER NOT NULL,
+            recorded_at TEXT NOT NULL
+        )
+    """)
+    conn.execute("""
+        CREATE INDEX IF NOT EXISTS idx_task_progress_agent_recorded
+        ON task_progress(agent_id, recorded_at)
+    """)
+    conn.commit()
+
+
+def _record_task_progress(agent_id, agent_name, task_attr):
+    try:
+        conn = get_task_db()
+        try:
+            conn.execute(
+                """INSERT INTO task_progress
+                   (agent_id, agent_name, task_name, task_description, task_progress, recorded_at)
+                   VALUES (?, ?, ?, ?, ?, ?)""",
+                (agent_id, agent_name, task_attr["name"], task_attr["description"],
+                 task_attr["progress"], utc_now_iso())
+            )
+            conn.commit()
+            print(f"[OK] Task progress recorded: {task_attr['name']} ({agent_name}, progress={task_attr['progress']})")
+        finally:
+            conn.close()
+    except Exception as e:
+        print(f"[Warning] Failed to record task progress ({task_attr['name']}): {e}")
+
+
+# ── Load member information from team.json ──
 
 def _load_team():
-    """Load team.json, return (by_name_dict, team_dict, gateway_url)"""
+    """Load team.json, return (by_name_dict, team_dict, gateway_url, reset_context)"""
     if TEAM_PATH.exists():
         try:
             with open(TEAM_PATH, "r", encoding="utf-8") as f:
@@ -128,7 +177,7 @@ def _load_team():
 TEAM_BY_NAME, TEAM_CONFIG, GATEWAY_URL, RESET_CONTEXT = _load_team()
 
 
-# ── Member Validation ──
+# ── Member validation ──
 
 def validate_member(name):
     """Validate whether the member exists, return the standardized name"""
@@ -140,7 +189,7 @@ def validate_member(name):
         sys.exit(1)
 
 
-# ── Mark All Unread Messages as Read ──
+# ── Mark all unread messages as read ──
 
 def mark_all_unread_as_read(reader_name, reader_id):
     """Mark viewed but unread messages for the specified member as read, return the count marked"""
@@ -149,7 +198,7 @@ def mark_all_unread_as_read(reader_name, reader_id):
     try:
         # Check if message_views table exists
         table_check = conn.execute("""
-            SELECT name FROM sqlite_master 
+            SELECT name FROM sqlite_master
             WHERE type='table' AND name='message_views'
         """).fetchone()
 
@@ -161,7 +210,7 @@ def mark_all_unread_as_read(reader_name, reader_id):
                    WHERE tm.recipient = ?
                      AND tmr.msg_id IS NULL
                      AND tm.msg_id IN (
-                         SELECT DISTINCT msg_id FROM message_views 
+                         SELECT DISTINCT msg_id FROM message_views
                          WHERE viewer_name = ? AND view_source = 'inbox'
                      )"""
             unread_rows = conn.execute(q, (reader_name, reader_name, reader_name)).fetchall()
@@ -188,7 +237,7 @@ def mark_all_unread_as_read(reader_name, reader_id):
     return result
 
 
-# ── New: Query Whether Any Member Has Unread Messages ──
+# ── New: Query whether any member has unread messages ──
 
 def has_any_unread():
     """Query whether there are any unread messages in the database (team-wide dimension)"""
@@ -210,7 +259,7 @@ def has_any_unread():
         conn.close()
 
 
-# ── New: Check Conditions and Enable msg_robot ──
+# ── New: Check conditions and enable msg_robot ──
 
 def check_and_enable_msg_robot():
     """
@@ -252,7 +301,7 @@ def check_and_enable_msg_robot():
                 print(MESSAGES["WARN_REFRESH_FAIL"].format(error=e))
 
 
-# ── New: Work Log Record Read/Write ──
+# ── New: Work log record read/write ──
 
 def _load_record(worklog_dir):
     """Read .record.jsonl, return {filename: mtime} dictionary"""
@@ -290,7 +339,7 @@ def _append_record(worklog_dir, filename, mtime):
         pass
 
 
-# ── New: Title Normalization and Keyword Extraction ──
+# ── New: Title normalization and keyword extraction ──
 
 def _normalize_title(title):
     """Remove numbers, special symbols, and spaces; keep only Chinese and English letters"""
@@ -359,35 +408,35 @@ def _match_titles(template_title, file_title):
             return coverage >= 0.35
 
 
-# ── New: Check Whether Work Log Content is Complete ──
+# ── New: Check whether work log content is complete ──
 
 def check_worklog(name):
     """
     Check whether work log content is complete.
 
     1. Ensure the work log directory exists (silently create if not)
-    2. Find the template file (earliest modification time among WorkLog-<name>-*.md)
-       - If no template found → silently skip check
+    2. Find the template file (earliest modification time among worklog-<name>-*.md)
+       - If no template found -> silently skip check
     3. Read .record.jsonl, check if there is a new work log
-       - If the latest file is already in the record and mtime is not updated → prompt and exit
+       - If the latest file is already in the record and mtime is not updated -> prompt and exit
     4. Extract ## headings from the template as standards
     5. Find the latest work log (most recently modified .md file)
-       - If only the template file exists → prompt to complete the work log and exit
+       - If only the template file exists -> prompt to complete the work log and exit
     6. Check whether the latest file contains all standard headings
-       - If missing → prompt missing content and exit
-       - If complete → write to .record.jsonl and return True
+       - If missing -> prompt missing content and exit
+       - If complete -> write to .record.jsonl and return True
     """
     worklog_dir = SCRIPT_DIR.parent.parent / "worklog" / name
 
     # 1. Ensure directory exists (silently create)
     worklog_dir.mkdir(parents=True, exist_ok=True)
 
-    # 2. Find template file: earliest modification time among WorkLog-<name>-*.md
+    # 2. Find template file: earliest modification time among worklog-<name>-*.md
     md_files = list(worklog_dir.glob("worklog-*.md"))
 
     template_candidates = [
         f for f in md_files
-        if f.name.startswith(f"workLog-{name}-") and f.name.endswith(".md")
+        if f.name.startswith(f"worklog-{name}-") and f.name.endswith(".md")
     ]
 
     if template_candidates:
@@ -472,11 +521,11 @@ def check_worklog(name):
                     # Only template file exists, no other work logs
                     print(MESSAGES["ERR_WORKLOG_NO_RECORD"].format(path=worklog_dir.as_posix(), template=template_file.name))
                     sys.exit(1)
-    # If no template found → silently skip (function naturally returns True)
+    # If no template found -> silently skip (function naturally returns True)
     return True
 
 
-# ── New: Clean Up temp Directory ──
+# ── New: Clean up temp directory ──
 
 def cleanup_temp_dir():
     """
@@ -486,14 +535,14 @@ def cleanup_temp_dir():
         project/
         ├── worklog/
         │   └── <name>/
-        ├── temp/          ← Target to clean
+        ├── temp/          <- Target to clean
         └── .DATA/
 
     1. Locate the temp directory
-    2. If temp directory does not exist → silently skip
+    2. If temp directory does not exist -> silently skip
     3. Traverse all files and subdirectories in the temp directory
     4. Check the last modification time (st_mtime) for each item
-    5. If older than 2 hours (7200 seconds) → delete (files with os.remove, directories with shutil.rmtree)
+    5. If older than 2 hours (7200 seconds) -> delete (files with os.remove, directories with shutil.rmtree)
     6. Print cleanup results
 
     Cross-platform compatible: uses pathlib + os/shutil, does not depend on shell commands.
@@ -534,7 +583,7 @@ def cleanup_temp_dir():
         print(MESSAGES["WARN_TEMP_CLEANUP"].format(error=e))
 
 
-# ── Send abort Signal ──
+# ── Send abort signal ──
 
 def send_abort_signal(session_key):
     """Send an abort signal to the session-abort-debug endpoint"""
@@ -561,7 +610,7 @@ def send_abort_signal(session_key):
         return False
 
 
-# ── Send reset Signal ──
+# ── Send reset signal ──
 
 def send_reset_signal(session_key):
     """Send a reset signal to the session-reset endpoint"""
@@ -588,7 +637,7 @@ def send_reset_signal(session_key):
         return False
 
 
-# ── Main Logic ──
+# ── Main logic ──
 
 def main():
     p = argparse.ArgumentParser(
@@ -617,6 +666,8 @@ def main():
         # ── Check whether work log content is complete ──
         check_worklog(name)
 
+        # ── Work log check passed, record T5 task progress ──
+        _record_task_progress(agent_id, name, T5_TASK)
 
         # ── Auto mark as read (controlled by MARK_READ_ON_DONE) ──
         if MARK_READ_ON_DONE:

@@ -1,8 +1,9 @@
+import fs from "fs";
 import { debug, info, error, getEventId } from "../shared/logger";
 import { CompactionConfig } from "../shared/types";
 import { getSessionActivityCache } from "./cache/manager";
 import { DatabaseSync } from "node:sqlite";  // F4: 静态导入，依赖 Node≥22（package.json engines 已强制）
-import { getCoordClawDbPath } from "../shared/paths";
+import { getCoordClawDbPath, getTaskProgressDbPath } from "../shared/paths";
 
 export const DEFAULT_LIFECYCLE_END_TIMEOUT_MS = 30 * 60 * 1000;
 export const DEFAULT_LANE_DRAINED_TIMEOUT_MS = 5_000;
@@ -136,6 +137,27 @@ export function refreshDatabase(projectRoot: string): void {
     dbInstances.delete(dbPath);
     debug('message-routing', `[DB] connection refreshed for WAL snapshot: ${dbPath}`, getEventId());
   }
+}
+
+/**
+ * 获取 task_progress.db 的只读连接（复用 dbInstances 缓存，与 coordclaw.db 按路径隔离）。
+ * 库文件不存在时返回 null —— 这是唯一允许上层回退旧逻辑（"是否发消息"代理）的信号。
+ * 库存在则以只读方式打开并缓存（PRAGMA WAL + busy_timeout 与 getDatabase 一致）。
+ *
+ * 注意：返回 null 仅代表"文件缺失"，绝不代表"未完成"；完成判定由 manager.getMemberTaskCompletion
+ * 在库存在时按 task_progress === 100 严格判断，读错/无记录一律保守为 false（不回退旧逻辑）。
+ */
+export function getTaskProgressDatabase(projectRoot: string): DatabaseSync | null {
+  const dbPath = getTaskProgressDbPath(projectRoot);
+  if (!fs.existsSync(dbPath)) return null;
+  const existing = dbInstances.get(dbPath);
+  if (existing) return existing;
+  const db = new DatabaseSync(dbPath, { readOnly: true });
+  db.exec("PRAGMA journal_mode = WAL");
+  db.exec("PRAGMA busy_timeout = 5000");
+  dbInstances.set(dbPath, db);
+  info('message-routing', `[INIT] task_progress database connected (readOnly) via node:sqlite: ${dbPath}`, getEventId());
+  return db;
 }
 
 // ==================== 全局 LLM 错误阻断 ====================

@@ -34,7 +34,7 @@ export interface AppConfig {
   autoCoordination?: boolean;
   databasePath?: string;
   language?: string;       // 'zh' | 'en' 等，来自 coordclaw.json
-  version?: string;        // 版本号，来自 coordclaw.json
+  version?: string;        // 版本号，来自 package.json（控制面板构建版本）
 }
 
 export interface RequestStats {

@@ -42,6 +42,7 @@ const DashboardModule = (function() {
         const mr = config.msgRobot;
         app.teamName = config.teamName || '';
         app.projectName = config.projectName || '';
+        app.version = config.version || '';
         app.memberCount = members.length;
         app.tokenUsage = config.estTotalTokens || 0;
         app.projectRoot = config.projectRoot || '';

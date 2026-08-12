@@ -10,5 +10,5 @@
 ### 2. When creating files, to avoid encoding issues, please be sure to read the tool contract description of write_file.py first. 
 ### 3. All deliverables pending review must be saved according to the **Project Directory Structure** rules. **Strictly prohibited from saving elsewhere**. Temporary files can be stored in temp, but must be cleaned up immediately after use.
 ### 4. Task deliverables are shared files; strictly prohibited from using **Work Logs** to replace task deliverables. Review comments must be independent documents.
-### 4. **Strictly prohibited from outputting deliverable file content to users**; deliverable files only need to be saved!
+### 5. **Strictly prohibited from outputting deliverable file content to users**; deliverable files only need to be saved!
 ## III. After completing message task processing, this completes the T2 standard action. Then immediately execute the T3 standard action to write the **Work Log** task.

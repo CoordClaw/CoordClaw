@@ -276,6 +276,9 @@
                             <span class="status-dot" :class="'status-' + gatewayStatus" title="Gateway"></span>
                             <span x-text="gatewayStatus === 'connected' ? 'Gateway' : 'Gateway'" style="font-size:10px;color:var(--text-secondary)"></span>
                         </div>
+                        <div style="display:flex;align-items:center;gap:3px">
+                            <span style="font-size:10px;color:var(--text-secondary)" x-text="'v' + (version || '')"></span>
+                        </div>
                     </div>
                 </div>
             </header>
@@ -339,7 +342,7 @@
     <script src="js/i18n.js?v=7"></script>
     <script src="js/sse-client.js?v=4"></script>
     <script src="js/ui.js?v=6"></script>
-    <script src="js/app-state.js?v=8"></script>
+    <script src="js/app-state.js?v=9"></script>
     <script src="js/services/api.js?v=15"></script>
     <script src="js/modules/chat.js?v=14"></script>
     <script src="js/modules/sidebar.js?v=5"></script>
@@ -348,7 +351,7 @@
     <script src="js/modules/model.js?v=5"></script>
     <script src="js/modules/projects.js?v=7"></script>
     <script src="js/modules/teams.js?v=8"></script>
-    <script src="js/modules/dashboard.js?v=5"></script>
+    <script src="js/modules/dashboard.js?v=6"></script>
     <script src="js/modules/messages.js?v=7"></script>
     <script src="js/app-main.js?v=20"></script>
 </body>

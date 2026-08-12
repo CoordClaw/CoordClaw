@@ -1,7 +1,7 @@
 import { debug, info, warn, error, getEventId } from "../../shared/logger";
 import { withTeamDbLock } from "../../shared/concurrency";
 import { UnreadMessageInfo } from "../../shared/types";
-import { getDatabase } from "../internal-state";
+import { getDatabase, getTaskProgressDatabase } from "../internal-state";
 import { getCoordClawDbPath } from "../../shared/paths";
 import { parseStoredUtc, toUnixSeconds, formatUtcStamp } from "../../shared/time";
 
@@ -146,6 +146,46 @@ export async function resetReadStatusForAgent(
     } catch (err: any) {
       error('message-routing', `resetReadStatusForAgent ERROR for ${agentId}: ${err.message}`, getEventId());
       return 0;
+    }
+  });
+}
+
+/**
+ * 查询成员 agent 的 T5 任务是否已完成（task_progress.db 权威真相源）。
+ *
+ * 返回语义（精确分野，与"有库必用 100 界限"一致）：
+ *   - null ：task_progress.db 文件不存在 —— 唯一允许上层回退旧逻辑（"是否发消息"）的信号。
+ *   - false：库存在，但（a）该 agent 无记录，或（b）最新 task_progress !== 100，或（c）读取出错。
+ *            一律保守为"未完成"，绝不回退旧的"是否发消息"代理逻辑。
+ *   - true ：库存在，且该 agent 最新一条 task_progress === 100（T5 完成）。
+ *
+ * 复用 withTeamDbLock（串行队列）+ dbQuery（薄封装）+ error/getEventId（既有日志方案）。
+ * 取该 agent 最新一条记录（ORDER BY id DESC LIMIT 1）的 task_progress 比对 100。
+ */
+export async function getMemberTaskCompletion(
+  projectRoot: string,
+  agentId: string
+): Promise<boolean | null> {
+  debug('message-routing', `[DB-QUERY] getMemberTaskCompletion: ${agentId}`, getEventId());
+  return withTeamDbLock(async () => {
+    const db = getTaskProgressDatabase(projectRoot);
+    if (!db) return null;   // 文件缺失 → 上层回退旧逻辑的唯一信号
+    try {
+      const rows = dbQuery<{ task_progress: number }>(
+        db,
+        `SELECT task_progress FROM task_progress WHERE agent_id = ? ORDER BY id DESC LIMIT 1`,
+        agentId
+      );
+      if (!rows.length) {
+        debug('message-routing', `[DB-RESULT] getMemberTaskCompletion: ${agentId} no record → false`, getEventId());
+        return false;
+      }
+      const done = rows[0].task_progress === 100;
+      debug('message-routing', `[DB-RESULT] getMemberTaskCompletion: ${agentId} task_progress=${rows[0].task_progress} → done=${done}`, getEventId());
+      return done;
+    } catch (err: any) {
+      error('message-routing', `getMemberTaskCompletion ERROR for ${agentId}: ${err.message}`, getEventId());
+      return false;  // 库存在但读错 → 保守未完成，绝不回退旧逻辑
     }
   });
 }

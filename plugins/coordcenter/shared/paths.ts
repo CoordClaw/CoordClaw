@@ -358,6 +358,9 @@ export const DATA_DIR_NAME = ".data/data";
 /** 数据库文件名 */
 export const DATABASE_FILENAME = "coordclaw.db";
 
+/** 成员任务进度数据库文件名（task_progress.db，由 agent 运行脚本写入，记录 T1-T5 完成进度） */
+export const TASK_PROGRESS_DB_FILENAME = "task_progress.db";
+
 /**
  * 获取 team.json 的完整路径
  * @param projectRoot 项目根目录（由 resolveProjectRoot 返回）
@@ -380,6 +383,16 @@ export function getTeamRuleMdPath(projectRoot: string): string {
  */
 export function getCoordClawDbPath(projectRoot: string): string {
   return path.resolve(path.join(projectRoot, DATA_DIR_NAME, DATABASE_FILENAME));
+}
+
+/**
+ * 获取 task_progress.db 的完整路径（含 path.resolve 确保绝对路径）
+ * 该库记录各成员 agent 的 T1-T5 任务进度（task_progress 字段，100 = T5 完成），
+ * 由 agent 运行脚本在每步开始时写入；与 coordclaw.db 同目录（DATA_DIR_NAME）。
+ * @param projectRoot 项目根目录
+ */
+export function getTaskProgressDbPath(projectRoot: string): string {
+  return path.resolve(path.join(projectRoot, DATA_DIR_NAME, TASK_PROGRESS_DB_FILENAME));
 }
 
 // ==================== 框架级文件路径（root = stateDir / QCLAW_HOME） ====================

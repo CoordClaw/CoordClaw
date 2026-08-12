@@ -2,7 +2,7 @@ import { debug, error, getEventId } from "../../shared/logger";
 import { getSessionRecordBySessionKey } from "../cache/manager";
 import { AgentLifecycleState, CalculationResult } from "../../shared/types";
 import { mapToBusinessState } from "./mapper";
-import { checkGroupchatSentInDb, getReceivedUnreadMessages, getSentUnreadMessages } from "../database/manager";
+import { checkGroupchatSentInDb, getMemberTaskCompletion, getReceivedUnreadMessages, getSentUnreadMessages } from "../database/manager";
 
 export async function calculateTriggerState(
   projectRoot: string,
@@ -10,7 +10,8 @@ export async function calculateTriggerState(
   agentName: string,
   startedAt: string,
   endedAt: string,
-  sessionKey: string
+  sessionKey: string,
+  allowT7: boolean = true
 ): Promise<CalculationResult> {
   debug('message-routing', `[TRACE] calculateTriggerState: ${agentName}(${agentId}) session=${sessionKey}`, getEventId());
   debug('message-routing', `[TRACE] calculateTriggerState: window=${startedAt} ~ ${endedAt}`, getEventId());
@@ -51,21 +52,38 @@ export async function calculateTriggerState(
   const sentUnread = await getSentUnreadMessages(projectRoot, agentId);
   debug('message-routing', `[TRACE] calculateTriggerState: ${agentName} sentUnread=${sentUnread.length}, messages=${JSON.stringify(sentUnread)}`, getEventId());
 
+  // 旧逻辑（兜底）：窗口内是否发过群聊消息——仅当 task_progress.db 不存在时使用
   const hasSentGroupchat = await checkGroupchatSentInDb(projectRoot, agentId, startedAt, endedAt);
-  debug('message-routing', `[TRACE] calculateTriggerState: ${agentName} hasSentGroupchat=${hasSentGroupchat} (window query)`, getEventId());
+  debug('message-routing', `[TRACE] calculateTriggerState: ${agentName} hasSentGroupchat=${hasSentGroupchat} (legacy window query, NO-DB fallback only)`, getEventId());
+
+  // 新真相源：task_progress.db 的 T5 完成态。null = 库文件不存在（回退旧逻辑）；否则必用 100 界限
+  const dbDone = await getMemberTaskCompletion(projectRoot, agentId);
+  debug('message-routing', `[TRACE] calculateTriggerState: ${agentName} dbDone=${dbDone} (null=no task_progress.db → fallback to legacy sent)`, getEventId());
+
+  // 有状态数据库：必用 100 界限判断完成；无库才回退旧的"是否发消息"代理
+  const isCompleted = dbDone === null ? Boolean(hasSentGroupchat) : dbDone;
+  debug('message-routing', `[TRACE] calculateTriggerState: ${agentName} isCompleted=${isCompleted} (computed: dbDone=${dbDone}, legacySent=${hasSentGroupchat})`, getEventId());
 
   const hasUnreadBool = Boolean(hasUnread);
-  const hasSentGroupchatBool = Boolean(hasSentGroupchat);
-  const state = mapToBusinessState(isRunning, hasUnreadBool, hasSentGroupchatBool);
+  const state = mapToBusinessState(isRunning, hasUnreadBool, isCompleted);
+
+  // force-route 等人类手动重评估 pass 不产生 agent 生命周期语义（不阻塞、不 reset）：
+  // 仅当允许 t7 时才产出 NEEDS_GROUPCHAT_FEEDBACK；否则降级为 COMPLETED_WITH_GROUPCHAT。
+  // 降级落点由 mapper 逻辑可证（t7 前提 !hasUnread，故唯一降级态为 COMPLETED_WITH_GROUPCHAT）。
+  // 注意：isCompleted（含 task_progress DB 读）仍必须计算——它同时决定未读态
+  // （NEEDS_GROUPCHAT_AND_UNREAD vs HAS_UNREAD_MESSAGES），不可省。
+  const finalState = (!allowT7 && state === AgentLifecycleState.NEEDS_GROUPCHAT_FEEDBACK)
+    ? AgentLifecycleState.COMPLETED_WITH_GROUPCHAT
+    : state;
 
   const totalTime = Date.now() - calcStartTime;
-  debug('message-routing', `calculateTriggerState: ${agentName} -> ${state} (unread=${hasUnreadBool}, sent=${hasSentGroupchatBool}, total=${totalTime}ms)`, getEventId());
+  debug('message-routing', `calculateTriggerState: ${agentName} -> ${finalState} (allowT7=${allowT7}, unread=${hasUnreadBool}, sent=${hasSentGroupchat}, total=${totalTime}ms)`, getEventId());
 
   return {
     has_unread: hasUnread,
-    has_sent_groupchat: hasSentGroupchat,
-    state,
-    raw: { running: isRunning, hasUnread: hasUnreadBool, hasSentGroupchat: hasSentGroupchatBool, aborted: cachedRecord?.aborted ?? false },
+    has_sent_groupchat: hasSentGroupchat,   // 保留旧值（legacy 代理），门控/日志不变；t7 真实触发改由 state 决定
+    state: finalState,
+    raw: { running: isRunning, hasUnread: hasUnreadBool, hasSentGroupchat: Boolean(hasSentGroupchat), aborted: cachedRecord?.aborted ?? false },
     receivedUnreadMessages: receivedUnread,
     sentUnreadMessages: sentUnread
   };

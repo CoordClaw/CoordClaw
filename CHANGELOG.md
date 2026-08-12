@@ -4,6 +4,15 @@ All notable changes to CoordClaw are documented here.
 
 Versioning convention: the git tag always matches `controlpanel/web/package.json` version (e.g. `v2.9.0`). See that file for the current public version.
 
+## [2.10.2] - 2026-08-12
+
+### Changed
+- **plugins/coordcenter · task tracking**: adopt the member standard-action execution database (task_progress.db) to determine whether an agent has completed its current round of tasks; group-chat feedback is now used only as a fallback mechanism.
+- **controlpanel/web**: public version bumped to 2.10.2.
+
+### Fixed
+- **plugins/coordcenter · force-route**: fixed a bug where force-route unconditionally triggered the unfinished-task notification even when there was no unfinished task.
+
 ## [2.10.1] - 2026-08-11
 
 ### Added

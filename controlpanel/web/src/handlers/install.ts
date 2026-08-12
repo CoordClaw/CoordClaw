@@ -14,7 +14,7 @@ import {
   OPENCLAW_JSON_FILENAME, COORDCLAW_JSON_FILENAME,
   TEAM_JSON_FILENAME, TEAM_JSON_SUBDIR,
   normalizePath, expandPath, readPlatformConfig, resolveExternalPlatformDir,
-  PLUGIN_DIR, SKILL_DIR, SKILL_NAME, getCoordClawRoot,
+  PLUGIN_DIR, SKILL_DIR, SKILL_NAME, getCoordClawRoot, PKG_VERSION,
   applyOpenClawRegistration, buildOpenClawRegCtx, writeOpenClawJson,
 } from '../config-resolver.js';
 import { sendJSON } from '../lib/response.js';
@@ -24,16 +24,14 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = join(__filename, '..');
 const COORDCLAW_ROOT = getCoordClawRoot();
 
-// 从 package.json 读取版本号和运行时配置
-let PKG_VERSION = '2.3';
+// 从 package.json 读取运行时配置（版本号统一由 config-resolver.PKG_VERSION 提供）
 let PKG_RUNTIME = 'browser';
 let PKG_DEFAULT_LANG = 'zh';
 try {
   const pkgPath = join(__dirname, '..', '..', 'package.json');
   if (existsSync(pkgPath)) {
-    const pkg = JSON.parse(readFileSync(pkgPath, 'utf-8'));
-    PKG_VERSION = pkg.version || PKG_VERSION;
-    PKG_RUNTIME = pkg.config?.runtime || PKG_RUNTIME;
+      const pkg = JSON.parse(readFileSync(pkgPath, 'utf-8'));
+      PKG_RUNTIME = pkg.config?.runtime || PKG_RUNTIME;
     PKG_DEFAULT_LANG = pkg.config?.defaultLanguage || PKG_DEFAULT_LANG;
   }
 } catch {}

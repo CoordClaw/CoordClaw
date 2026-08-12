@@ -17,6 +17,15 @@ import { normalizeLanguage } from './lib/lang.js';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = join(__filename, '..');
 
+// 控制面板构建版本：package.json 为唯一真相源（coordclaw.json 版本即其安装期副本）
+export const PKG_VERSION = (() => {
+  try {
+    const p = join(__dirname, '..', 'package.json'); // src/.. 与 dist/.. 均落 web/package.json
+    if (existsSync(p)) return JSON.parse(readFileSync(p, 'utf-8')).version || '0.0.0';
+  } catch {}
+  return '0.0.0';
+})();
+
 /** CoordClaw 安装根目录（dist/ 上 3 级 → web/controlpanel/CoordClaw）。install 与自愈共用，单一真相源。 */
 export function getCoordClawRoot(): string {
   return join(__dirname, '..', '..', '..');
@@ -281,7 +290,7 @@ export class ConfigResolver {
       autoCoordination: autoCoordination,
       language: teamclawConfig.language,
       startupStatus: teamclawConfig.startupStatus || 'ok',
-      version: teamclawConfig.version || '0.0.0',
+      version: PKG_VERSION || '0.0.0',
     };
 
     this.cache = config;
@@ -357,7 +366,7 @@ export class ConfigResolver {
           config.language = language;
           writeCoordClawJson(config);
         }
-        return { databasePath: '', projectRoot: '', projectName: '', language, startupStatus: 'empty', version: config.version };
+        return { databasePath: '', projectRoot: '', projectName: '', language, startupStatus: 'empty', version: PKG_VERSION };
       }
 
       const projectRoot = expandPath(activeProject.root);
@@ -378,7 +387,7 @@ export class ConfigResolver {
       console.log(`   👥 Member config: ${teamJsonPath}`);
       console.log(`[ConfigResolver] ✅ Config resolved (project root resolved dynamically)`);
 
-      return { databasePath, projectRoot, projectName, language, version: config.version };
+      return { databasePath, projectRoot, projectName, language, version: PKG_VERSION };
 
     } catch (error) {
       console.error(`[ConfigResolver] ❌ Failed to resolve CoordClaw config:`, error);
