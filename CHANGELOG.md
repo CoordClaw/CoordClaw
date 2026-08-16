@@ -4,6 +4,15 @@ All notable changes to CoordClaw are documented here.
 
 Versioning convention: the git tag always matches `controlpanel/web/package.json` version (e.g. `v2.9.0`). See that file for the current public version.
 
+## [2.10.3] - 2026-08-16
+
+### Fixed
+- **controlpanel/web · message-triggered dispatch**: fixed a bug where a message sent from the web control panel (a human user action) falsely triggered the "previous round task unfinished, please continue" notification. Web-sent messages are user-initiated and are no longer subject to previous-task-completion checks.
+
+### Changed
+- **teamstemplate · project charter**: refined the template team's project charter so the long-term goal stays more stable.
+- **controlpanel/web**: public version bumped to 2.10.3 (coordcenter internal `19.70.0`).
+
 ## [2.10.2] - 2026-08-12
 
 ### Changed

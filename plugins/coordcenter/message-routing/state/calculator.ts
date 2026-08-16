@@ -10,8 +10,7 @@ export async function calculateTriggerState(
   agentName: string,
   startedAt: string,
   endedAt: string,
-  sessionKey: string,
-  allowT7: boolean = true
+  sessionKey: string
 ): Promise<CalculationResult> {
   debug('message-routing', `[TRACE] calculateTriggerState: ${agentName}(${agentId}) session=${sessionKey}`, getEventId());
   debug('message-routing', `[TRACE] calculateTriggerState: window=${startedAt} ~ ${endedAt}`, getEventId());
@@ -67,22 +66,13 @@ export async function calculateTriggerState(
   const hasUnreadBool = Boolean(hasUnread);
   const state = mapToBusinessState(isRunning, hasUnreadBool, isCompleted);
 
-  // force-route 等人类手动重评估 pass 不产生 agent 生命周期语义（不阻塞、不 reset）：
-  // 仅当允许 t7 时才产出 NEEDS_GROUPCHAT_FEEDBACK；否则降级为 COMPLETED_WITH_GROUPCHAT。
-  // 降级落点由 mapper 逻辑可证（t7 前提 !hasUnread，故唯一降级态为 COMPLETED_WITH_GROUPCHAT）。
-  // 注意：isCompleted（含 task_progress DB 读）仍必须计算——它同时决定未读态
-  // （NEEDS_GROUPCHAT_AND_UNREAD vs HAS_UNREAD_MESSAGES），不可省。
-  const finalState = (!allowT7 && state === AgentLifecycleState.NEEDS_GROUPCHAT_FEEDBACK)
-    ? AgentLifecycleState.COMPLETED_WITH_GROUPCHAT
-    : state;
-
   const totalTime = Date.now() - calcStartTime;
-  debug('message-routing', `calculateTriggerState: ${agentName} -> ${finalState} (allowT7=${allowT7}, unread=${hasUnreadBool}, sent=${hasSentGroupchat}, total=${totalTime}ms)`, getEventId());
+  debug('message-routing', `calculateTriggerState: ${agentName} -> ${state} (unread=${hasUnreadBool}, sent=${hasSentGroupchat}, total=${totalTime}ms)`, getEventId());
 
   return {
     has_unread: hasUnread,
     has_sent_groupchat: hasSentGroupchat,   // 保留旧值（legacy 代理），门控/日志不变；t7 真实触发改由 state 决定
-    state: finalState,
+    state,
     raw: { running: isRunning, hasUnread: hasUnreadBool, hasSentGroupchat: Boolean(hasSentGroupchat), aborted: cachedRecord?.aborted ?? false },
     receivedUnreadMessages: receivedUnread,
     sentUnreadMessages: sentUnread

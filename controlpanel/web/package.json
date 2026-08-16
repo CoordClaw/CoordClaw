@@ -1,6 +1,6 @@
 {
   "name": "coordclaw-controlpanel",
-  "version": "2.10.2",
+  "version": "2.10.3",
   "description": "CoordClaw 控制面板 - 多智能体团队协调中心",
   "type": "module",
   "engines": {

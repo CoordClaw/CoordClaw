@@ -82,15 +82,14 @@ export async function transitionToEnded(sessionKey: string, agentId: string, sou
 // ==================== 路由阻断判据（统一复用） ====================
 // 全局 LLM 错误置真时，除非 force-route 显式穿透，否则不路由（含 auto-reset）。
 // 抽出单一真相源，供 updateStatus 入口与 executeMessageRouting 入口共用，消除两处不一致。
-function isRoutingBlocked(source: string): boolean {
-  return globalLlmState.error && !source.startsWith("force-route");
+// force-route 判定（统一谓词，单一真相源）：人类借 sessionkey 强制触发。
+// 供 isRoutingBlocked（穿透路由阻断）、trigger 状态计算选路、mark 守卫复用，消除多处裸写 startsWith。
+function isForceRoute(source: string): boolean {
+  return source.startsWith("force-route");
 }
 
-// force-route（人类手动重评估 pass）不产生 agent 生命周期语义（不阻塞、不 reset）：
-// 其触发态不应产出 NEEDS_GROUPCHAT_FEEDBACK（t7）。与 isRoutingBlocked 同风格、正交——
-// 前者管"是否路由"，本函数管"是否允许 t7"，二者均按 source 前缀判定。
-function isT7Suppressed(source: string): boolean {
-  return source.startsWith("force-route");
+function isRoutingBlocked(source: string): boolean {
+  return globalLlmState.error && !isForceRoute(source);
 }
 
 // ==================== updateStatus ====================
@@ -207,16 +206,11 @@ export async function executeMessageRouting(sessionKey: string, source: string):
       try {
         const isTrigger = mAgentId === agentId;
         if (isTrigger) {
-          info('message-routing', `[ROUTING] [${chainId}]   ${mAgentName}(${mAgentId}): [TRIGGER] using trigger window`, getEventId());
-          const stateResult = await calculateTriggerState(
-            projectRoot,
-            mAgentId,
-            mAgentName,
-            triggerStartedAt,
-            triggerEndedAt,
-            sessionKey,
-            !isT7Suppressed(source),
-          );
+          // force-route：人类借 sessionkey 强制触发，不针对前面任务完成情况，应按 other 成员对待——
+          // 只查未读（有未读→msg1 供下轮任务提醒），结构性禁 t7/msg2（不替 agent 产任务反馈/催促语义）。
+          const stateResult = isForceRoute(source)
+            ? await calculateOtherMemberState(projectRoot, mAgentId, mAgentName, sessionKey)
+            : await calculateTriggerState(projectRoot, mAgentId, mAgentName, triggerStartedAt, triggerEndedAt, sessionKey);
           memberStates.set(mAgentId, {
             sessionKey,
             agentName: mAgentName,
@@ -226,7 +220,7 @@ export async function executeMessageRouting(sessionKey: string, source: string):
             firstUnreadAt: getEarliestUnreadAt(stateResult.receivedUnreadMessages),
             aborted: stateResult.raw.aborted,
           });
-          info('message-routing', `[ROUTING] [${chainId}]   STATE | ${mAgentName}(${mAgentId})=${stateResult.state} (unread=${stateResult.has_unread}, groupchat=${stateResult.has_sent_groupchat})`, getEventId());
+          info('message-routing', `[ROUTING] [${chainId}]   STATE | ${mAgentName}(${mAgentId})=${stateResult.state} (unread=${stateResult.has_unread}, groupchat=${stateResult.has_sent_groupchat})${isForceRoute(source) ? ' [force-route→other计算]' : ''}`, getEventId());
         } else {
           const ownSessionKey = m.sessionKey || `${mAgentId}:dashboard:unknown`;
           info('message-routing', `[ROUTING] [${chainId}]   ${mAgentName}(${mAgentId}): [OTHER] using own sessionKey=${ownSessionKey}`, getEventId());
