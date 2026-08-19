@@ -148,7 +148,7 @@ Token-consumption charts are shown below:
 > 2. **Then install CoordClaw** (clone the repo and start it). After CoordClaw is installed, open OpenClaw / its variant again, then click to enter CoordClaw.
 > 3. **Every first start / restart**: open OpenClaw (or its variant) first, then open the CoordClaw control panel.
 
-1. Install CoordClaw: Linux/Mac run `node start.js`; Windows double-click `start.bat` or likewise run `node start.js` to start the service (Linux/macOS not yet tested; see "Platform Support Status").
+1. Install CoordClaw: Linux/Mac run `node start.cjs`; Windows double-click `start.bat` or likewise run `node start.cjs` to start the service (Linux/macOS not yet tested; see "Platform Support Status").
 
 2. On first open, the control panel (`http://localhost:18790`) automatically enters the setup wizard: choose language → check the OpenClaw instance → one-click install.
 
@@ -322,7 +322,7 @@ The MD documents corresponding to the scripts can be modified as needed.
 
 CoordClaw has completed cross-platform compatibility work (path separator normalization, three-platform `execFile` process invocation, port probing via Node native APIs, etc.), and is compatible at the code level with Windows / Linux / macOS.
 
-**Currently it has only been fully tested and verified on Windows, where it runs stably.** Linux and macOS have code-level compatibility and can be started via `node start.js`, but **have not yet been tested in real environments**, so out-of-the-box operation is not guaranteed.
+**Currently it has only been fully tested and verified on Windows, where it runs stably.** Linux and macOS have code-level compatibility and can be started via `node start.cjs`, but **have not yet been tested in real environments**, so out-of-the-box operation is not guaranteed.
 
 **Tested environment**: Windows 11 Pro (24H2), with Openclaw (v2026.4.5) and Qclaw (v0.2.32). Note that Qclaw (v0.2.32) is built on Openclaw (v2026.6.5).
 

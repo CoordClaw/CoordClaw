@@ -150,7 +150,7 @@ CoordClaw 的"上帝视角"不只是看消息，更要看协作的**成本与轨
 > 2. **再安装 CoordClaw**（克隆仓库后启动）。安装CoordClaw完成后，请再次打开OpenClaw / 变体，最后点击进入CoordClaw。
 > 3. **每次首次启动 / 重启后**：先打开 OpenClaw（或其变体），再打开 CoordClaw 控制面板。
 
-1. 安装 CoordClaw：Linux/Mac 运行 `node start.js`，Windows 双击 `start.bat` 或同样 `node start.js` 开启服务（Linux/macOS 未实测，见「平台支持状态」）。
+1. 安装 CoordClaw：Linux/Mac 运行 `node start.cjs`，Windows 双击 `start.bat` 或同样 `node start.cjs` 开启服务（Linux/macOS 未实测，见「平台支持状态」）。
 
 2. 首次打开控制面板（`http://localhost:18790`）自动进入安装向导：选语言 → 勾选 OpenClaw 实例 → 一键安装。
 
@@ -323,7 +323,7 @@ CoordClaw 的协作行为由三类文件分层驱动，职责边界清晰：
 
 CoordClaw 已完成跨平台兼容改造（路径分隔符归一、三平台 `execFile` 进程调用、端口探测采用 Node 原生 API 等），代码层面支持 Windows / Linux / macOS 运行。
 
-**当前仅在 Windows 环境下经过完整测试与验证，运行稳定。** Linux 与 macOS 虽已完成代码层兼容、可经 `node start.js` 启动，但**尚未进行实际环境测试**，不保证开箱即用。
+**当前仅在 Windows 环境下经过完整测试与验证，运行稳定。** Linux 与 macOS 虽已完成代码层兼容、可经 `node start.cjs` 启动，但**尚未进行实际环境测试**，不保证开箱即用。
 
 **已测试环境**：Windows 11 专业版（24H2），Openclaw(v2026.4.5) 和 Qclaw(v0.2.32)。其中 Qclaw(v0.2.32) 基于 Openclaw(v2026.6.5) 开发。
 

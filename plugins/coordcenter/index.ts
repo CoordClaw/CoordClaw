@@ -59,7 +59,7 @@ import {
   globalLlmState,
 } from "./message-routing";
 import type { TokenUsage } from "./shared/types";
-import { applyRuntimeConfig, llmErrorConfig, HEALTH_RESCUE_LIMIT } from "./shared/runtime-config";
+import { applyRuntimeConfig, llmErrorConfig, HEALTH_RESCUE_LIMIT, scanMessagesForLlmError } from "./shared/runtime-config";
 import { deleteSnapshotFile, writeSnapshotFile, writePulseNotification } from "./session-snapshot";
 import { registerLlmInputDumpHook } from "./llm-input-dump";
 import { computeAndPersist, cacheSystemPrompt } from "./token-stats/pool";
@@ -442,22 +442,10 @@ function registerSignals(api: any, ctx: BootContext): void {
     // 正常 agent_end → 全局标志归零（通路正常）
     globalLlmState.error = false;
     globalLlmState.rescueCount = 0;
-    // [AGENT-END-ERROR] 从 agent_end 消息数组最后一个 assistant errorCode 检测 LLM 错误
-    if (llmErrorConfig.enabled) {
-      const msgs = _event?.messages;
-      if (Array.isArray(msgs)) {
-        for (let i = msgs.length - 1; i >= 0; i--) {
-          const ec = msgs[i]?.errorCode;
-          if (ec != null) {
-            const code = Number(ec);
-            if (!isNaN(code) && llmErrorConfig.endcodes.includes(code)) {
-              globalLlmState.error = true;
-              info('plugin', `[AGENT-END-ERROR] errorCode=${code} → globalLlmError=true`, getEventId());
-            }
-            break;
-          }
-        }
-      }
+    // [AGENT-END-ERROR] 从 agent_end 消息数组按可配置字段抽取 LLM 错误码（兼容 errorCode / errorMessage 等多种网关形态）
+    if (llmErrorConfig.enabled && scanMessagesForLlmError(_event?.messages, llmErrorConfig.fields, llmErrorConfig.endcodes)) {
+      globalLlmState.error = true;
+      info('plugin', `[AGENT-END-ERROR] llmErrorCode detected → globalLlmError=true`, getEventId());
     }
     // token-stats: 每轮 run 推送统计（独立异步，不阻塞）
     // projectRoot 由 computeAndPersist 内部 resolveActiveProjectRoot() 复用 cache-refresh Layer 1 单一真源解析，此处无需冗余 set

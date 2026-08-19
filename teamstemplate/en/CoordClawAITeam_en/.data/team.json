@@ -22,7 +22,8 @@
     "endcode": [
       402,
       429
-    ]
+    ],
+    "fields": ["errorMessage", "errorCode"]
   },
   "checkmessagesrepeatedly": {
     "reminder": {

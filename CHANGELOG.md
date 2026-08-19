@@ -4,6 +4,15 @@ All notable changes to CoordClaw are documented here.
 
 Versioning convention: the git tag always matches `controlpanel/web/package.json` version (e.g. `v2.9.0`). See that file for the current public version.
 
+## [2.10.4] - 2026-08-20
+
+### Fixed
+- **plugins/coordcenter · LLM error handling**: enhanced LLM error-code detection; `team.json` now supports custom error-code key names, improving compatibility across more openclaw variants.
+- **docs**: fixed an incorrect script name referenced in README (zh/en).
+
+### Changed
+- **controlpanel/web**: public version bumped to 2.10.4 (coordcenter internal `19.74.0`).
+
 ## [2.10.3] - 2026-08-16
 
 ### Fixed

@@ -1,8 +1,8 @@
 {
   "id": "coordclawcenter",
   "name": "CoordClawCenter",
-  "version": "19.70.0",
-  "description": "19.70.0 - Code quality refactor: register() split, shared patch library extraction, removal of sessions.json dependency, global Map cascading cleanup, health-poll fallback. WebChat Widget SDK + project-switch.",
+  "version": "19.74.0",
+  "description": "19.74.0 - Code quality refactor: register() split, shared patch library extraction, removal of sessions.json dependency, global Map cascading cleanup, health-poll fallback. WebChat Widget SDK + project-switch.",
   "main": "index.ts",
   "entry": "./dist/index.js",
   "skills": ["./skills"],

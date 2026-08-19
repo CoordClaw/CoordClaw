@@ -169,7 +169,7 @@ export async function reloadFileCache(cacheTtl: number = 0): Promise<CacheOperat
   try {
     const { teamData } = await loadTeamFromFiles(cacheTtl);
     const snapshot = applyRuntimeConfig(teamData);
-    info(MODULE, `[RELOAD] L5 运行时配置已刷新: compaction=${snapshot.compaction?.enabled ? "on" : "off"} llm_error=${snapshot.llmError.enabled ? snapshot.llmError.endcodes.join(",") : "off"} ctx_opt=${snapshot.contextOptimization.enabled ? "on" : "off"} dump=${snapshot.llmInputDumpEnabled ? "on" : "off"}`, eventId);
+    info(MODULE, `[RELOAD] L5 运行时配置已刷新: compaction=${snapshot.compaction?.enabled ? "on" : "off"} llm_error=${snapshot.llmError.enabled ? "endcodes=[" + snapshot.llmError.endcodes.join(",") + "] fields=[" + snapshot.llmError.fields.join(",") + "]" : "off"} ctx_opt=${snapshot.contextOptimization.enabled ? "on" : "off"} dump=${snapshot.llmInputDumpEnabled ? "on" : "off"}`, eventId);
   } catch (err: any) {
     const errMsg = `应用运行时配置失败: ${err.message}`;
     errors.push(errMsg);
@@ -228,7 +228,7 @@ export async function syncTeamData(cacheTtl: number = 0): Promise<SyncTeamDataRe
   try {
     const { teamData } = await loadTeamFromFiles(cacheTtl);
     const snapshot = applyRuntimeConfig(teamData);
-    info(MODULE, `[SYNC] L5 运行时配置已刷新: compaction=${snapshot.compaction?.enabled ? "on" : "off"} llm_error=${snapshot.llmError.enabled ? snapshot.llmError.endcodes.join(",") : "off"} ctx_opt=${snapshot.contextOptimization.enabled ? "on" : "off"} dump=${snapshot.llmInputDumpEnabled ? "on" : "off"}`, eventId);
+    info(MODULE, `[SYNC] L5 运行时配置已刷新: compaction=${snapshot.compaction?.enabled ? "on" : "off"} llm_error=${snapshot.llmError.enabled ? "endcodes=[" + snapshot.llmError.endcodes.join(",") + "] fields=[" + snapshot.llmError.fields.join(",") + "]" : "off"} ctx_opt=${snapshot.contextOptimization.enabled ? "on" : "off"} dump=${snapshot.llmInputDumpEnabled ? "on" : "off"}`, eventId);
   } catch (err: any) {
     const errMsg = `应用运行时配置失败: ${err.message}`;
     errors.push(errMsg);
@@ -324,7 +324,7 @@ export async function fullReset(cacheTtl: number = 0): Promise<CacheOperationRes
   // ====== Layer 5: 运行时配置热更新 ======
   try {
     const snapshot = applyRuntimeConfig(teamData);
-    info(MODULE, `[RESET] L5 运行时配置已刷新: compaction=${snapshot.compaction?.enabled ? "on" : "off"} llm_error=${snapshot.llmError.enabled ? snapshot.llmError.endcodes.join(",") : "off"} ctx_opt=${snapshot.contextOptimization.enabled ? "on" : "off"} dump=${snapshot.llmInputDumpEnabled ? "on" : "off"}`, eventId);
+    info(MODULE, `[RESET] L5 运行时配置已刷新: compaction=${snapshot.compaction?.enabled ? "on" : "off"} llm_error=${snapshot.llmError.enabled ? "endcodes=[" + snapshot.llmError.endcodes.join(",") + "] fields=[" + snapshot.llmError.fields.join(",") + "]" : "off"} ctx_opt=${snapshot.contextOptimization.enabled ? "on" : "off"} dump=${snapshot.llmInputDumpEnabled ? "on" : "off"}`, eventId);
   } catch (err: any) {
     const errMsg = `应用运行时配置失败: ${err.message}`;
     errors.push(errMsg);
