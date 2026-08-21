@@ -1,7 +1,6 @@
 import fs from "fs";
 import { debug, info, error, getEventId } from "../shared/logger";
-import { CompactionConfig } from "../shared/types";
-import { getSessionActivityCache } from "./cache/manager";
+import { AgentActivityRecord, CompactionConfig } from "../shared/types";
 import { DatabaseSync } from "node:sqlite";  // F4: 静态导入，依赖 Node≥22（package.json engines 已强制）
 import { getCoordClawDbPath, getTaskProgressDbPath } from "../shared/paths";
 
@@ -56,7 +55,7 @@ export function clearSignals(sessionKey: string): void {
 }
 
 // ==================== 内部状态 ====================
-export const sessionActivityCache = getSessionActivityCache();
+export const sessionActivityCache = new Map<string, AgentActivityRecord>();
 export let cachedConfig: { jsonPath: string; cacheTtl: number; stateDir: string } | null = null;
 let dbInstances = new Map<string, DatabaseSync>();
 

@@ -1,7 +1,7 @@
 import { debug, info, warn, getEventId } from "../../shared/logger";
 import { AgentLifecycleState, AgentActivityRecord } from "../../shared/types";
 import { getSessionQueueTracker } from "../session-queue-tracker";
-import { clearSignals, resetMsgReminderCount, resetLastCompactionTime, clearAncillaryState } from "../internal-state";
+import { clearSignals, resetMsgReminderCount, resetLastCompactionTime, clearAncillaryState, sessionActivityCache } from "../internal-state";
 
 // 创建"已结束、不可修复"的会话活动记录（消除 B 集群 fixable 缺失 + 去重两处字面量）。
 function createEndedRecord(agentId: string, sessionKey: string, agentName: string): AgentActivityRecord {
@@ -26,7 +26,6 @@ function createEndedRecord(agentId: string, sessionKey: string, agentName: strin
   };
 }
 
-const sessionActivityCache = new Map<string, AgentActivityRecord>();
 const agentIdToSessionKey = new Map<string, string>();
 
 export function getSessionActivityCache(): Map<string, AgentActivityRecord> {
