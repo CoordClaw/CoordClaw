@@ -4,6 +4,15 @@ All notable changes to CoordClaw are documented here.
 
 Versioning convention: the git tag always matches `controlpanel/web/package.json` version (e.g. `v2.9.0`). See that file for the current public version.
 
+## [2.10.5] - 2026-08-21
+
+### Fixed
+- **plugins/coordcenter · session-key migration**: fixed the whitelist-update issue that occurred when migrating a project and creating a new project `sessionKey`. The tracked-session whitelist is now correctly refreshed on project migration so new sessions are properly included.
+
+### Changed
+- **controlpanel/web · token stats**: enhanced token statistics to break down consumption by `agentId`, giving per-agent visibility into token usage.
+- **controlpanel/web**: public version bumped to 2.10.5 (coordcenter internal `19.81.0`).
+
 ## [2.10.4] - 2026-08-20
 
 ### Fixed

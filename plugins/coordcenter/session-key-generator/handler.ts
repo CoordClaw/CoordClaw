@@ -12,8 +12,7 @@ import { loadTeamContext, TeamContext } from "../shared/team-loader";
 import { loadProjectTeamJson } from "../prompt-injection";
 import { callGatewayRpc } from "../shared/gateway-rpc";
 import { getTeamJsonPath } from "../shared/paths";
-import { writeJsonSafeOrThrow } from "../shared/json-atomic";
-import { syncTeamData } from "../shared/cache-coordinator";
+import { writeTeamJson } from "../shared/config-store";
 import { HttpRouteConfig } from "../shared/types-http";
 
 export interface CreateSessionKeyResult {
@@ -271,20 +270,14 @@ export async function batchCreateSessionKeys(
 
   let writeFailed = false;
   if (updated > 0) {
-    try {
-      writeJsonSafeOrThrow(teamJsonPath, teamData);
-      info(caller, `[HTTP] ✅ team.json已更新`, eventId);
-
-      // 增量同步运行时数据，不破坏正在运行 agent 的状态
-      try {
-        const syncResult = await syncTeamData();
-        info(caller, `[HTTP] ✅ cache-sync: ${syncResult.message}`, eventId);
-      } catch (refreshErr: any) {
-        warn(caller, `[HTTP] ⚠️ cache-sync 部分失败: ${refreshErr.message}`, eventId);
-      }
-    } catch (err: any) {
-      error(caller, `[HTTP] ❌ 写入team.json失败: ${err.message}`, eventId);
+    // 统一走 writeTeamJson 单一出口：落盘后由 writeTeamJson 自动 syncTeamData，
+    // 不再在此处手动同步（消除第二写路径的局部修订）
+    const w = writeTeamJson(projectRoot, teamData);
+    if (!w.ok) {
+      error(caller, `[HTTP] ❌ 写入team.json失败: ${w.error ?? "unknown"}`, eventId);
       writeFailed = true;
+    } else {
+      info(caller, `[HTTP] ✅ team.json已更新（缓存由 writeTeamJson 自动同步）`, eventId);
     }
   }
 

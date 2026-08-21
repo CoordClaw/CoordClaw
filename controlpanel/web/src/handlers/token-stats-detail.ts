@@ -9,7 +9,7 @@
 
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { existsSync } from 'node:fs';
-import { tokenStatsService, type BreakdownMember, type SessionTokenRow } from '../lib/token-stats.js';
+import { tokenStatsService, matchSessionKeyToMember, type BreakdownMember, type SessionTokenRow } from '../lib/token-stats.js';
 
 interface TokenStatsConfig {
   projectRoot: string;
@@ -152,11 +152,8 @@ export function handleTokenStatsDetail(config: TokenStatsConfig, req: IncomingMe
       return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate()) + ' ' + p(d.getHours()) + ':' + p(d.getMinutes());
     };
     const resolveName = (sk: string): string => {
-      for (const m of (config.members || [])) {
-        const mk = m.sessionKey || '';
-        if (!mk) continue;
-        if (sk === mk || sk.startsWith(mk + ':')) return m.name;
-      }
+      const idx = matchSessionKeyToMember(sk, config.members || []);
+      if (idx >= 0) return (config.members || [])[idx].name;
       const parts = sk.split(':');
       return parts[0] === 'agent' && parts[1] ? parts[1] : (sk || '未知');
     };

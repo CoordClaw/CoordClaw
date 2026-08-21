@@ -1090,6 +1090,9 @@ export class ControlPanelServer {
       estTotalTokens: config.estTotalTokens || 0,
       language: config.language || 'zh',
       startupStatus: config.startupStatus || 'ok',
+      databasePath: config.databasePath || '',
+      // openclawUserDir 未安装时 getOpenClawUserDir 抛异常，需兜底避免 /api/config 500
+      openclawUserDir: (() => { try { return getOpenClawUserDir(); } catch { return ''; } })(),
     };
 
     this.sendJSON(res, 200, safeConfig);

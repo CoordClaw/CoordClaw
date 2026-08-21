@@ -23,6 +23,7 @@ import {
 } from "./paths";
 import { resolveProjectRoot } from "../prompt-injection";
 import { writeJsonSafe } from "./json-atomic";
+import { syncTeamData } from "./cache-coordinator";
 
 const BOM = "﻿";
 function stripBom(s: string): string {
@@ -90,7 +91,12 @@ export function writePluginConfig(data: unknown): { ok: boolean; error?: string 
 
 /** 项目级 team.json 写（active-root 糖；多 root 写请直接 writeJsonSafe 显式 path） */
 export function writeTeamJson(projectRoot: string, data: unknown): { ok: boolean; error?: string } {
-  return writeJsonSafe(getTeamJsonPath(projectRoot), data);
+  const r = writeJsonSafe(getTeamJsonPath(projectRoot), data);
+  // 单一出口契约：落盘即同步运行时缓存与会话索引，保证最终一致。
+  // syncTeamData 首步 clearLoaderCache 同步不可抛，且全程 try/catch 不 reject，
+  // 故 fire-and-forget 既不会吞掉磁盘写结果，也不会产生未处理 rejection。
+  if (r.ok) void syncTeamData();
+  return r;
 }
 
 /** 团队级 team.json 写 */

@@ -85,9 +85,30 @@ const ZERO_MEMBER = (): MemberTokenStat => ({
 });
 
 /**
+ * 单一匹配真相源：给定记录的 sessionKey，返回其在 members 中的下标；-1 表示未匹配任何成员。
+ * 两级匹配（聚合与表格标签共用，确保两处行为一致、不分化）：
+ *   ① 配置会话优先：记录.sessionKey === 成员.sessionKey，或以其为前缀（兼容 :heartbeat 等后缀）。
+ *   ② agent_id 退回：匹配不到时，若 sessionKey 形如 agent:<agent_id>:... 且第 2 段等于成员.agent_id，
+ *      则归到该成员（应对"同 agent 开新会话、sessionKey 变而 agent_id 不变"的场景）。
+ * 注意：agent_id 退回归于格式假设——新 sessionKey 须保持 agent:<agent_id>:...；若格式丢弃 agent_id，
+ *      则退回失效（记录仍进 unmatched，优雅降级，与现状一致）。
+ */
+export function matchSessionKeyToMember(sk: string, members: BreakdownMember[]): number {
+  if (!sk) return -1;
+  const seg = sk.split(':');
+  for (let i = 0; i < members.length; i++) {
+    const m = members[i];
+    const mk = m.sessionKey || '';
+    if (mk && (sk === mk || sk.startsWith(mk + ':'))) return i;                 // ① 配置会话（精确 + 后缀）
+    if (m.agent_id && seg[0] === 'agent' && seg[1] === m.agent_id) return i;    // ② agent_id 退回
+  }
+  return -1;
+}
+
+/**
  * 读取 jsonl，按 sessionId 去重（保留 estTotal 最大的整条记录，保证各 est 字段一致），
- * 再按成员 sessionKey 前缀匹配聚合。实时读盘、无缓存。
- * 匹配规则：记录.sessionKey === 成员.sessionKey || startsWith(成员.sessionKey + ':')。
+ * 再按成员 sessionKey 匹配聚合。实时读盘、无缓存。
+ * 匹配规则见 matchSessionKeyToMember：先严格匹配成员.sessionKey（精确/其后缀），匹配不到按 agent_id 段退回。
  */
 export function readBreakdown(filePath: string, members: BreakdownMember[]): TokenBreakdown {
   const result: TokenBreakdown = {
@@ -121,33 +142,25 @@ export function readBreakdown(filePath: string, members: BreakdownMember[]): Tok
     }
   }
 
-  // ② 按成员 sessionKey 前缀建立匹配表（保持 members 顺序）
-  const memberMap = new Map<string, MemberTokenStat>();
-  for (const m of members) {
+  // ② 每个成员一个聚合桶（与 members 顺序/数量一致；用平行数组避免按 sessionKey 建 Map 的 '' 撞键问题）
+  const stats: MemberTokenStat[] = members.map((m) => {
     const stat = ZERO_MEMBER();
     stat.name = m.name;
     stat.agentId = m.agent_id;
     stat.role = m.role || '';
     stat.roleLabel = m.role_label || '';
-    memberMap.set(m.sessionKey || '', stat);
-  }
-  const matchMember = (sk: string): MemberTokenStat | null => {
-    for (const m of members) {
-      const mk = m.sessionKey || '';
-      if (!mk) continue;
-      if (sk === mk || sk.startsWith(mk + ':')) return memberMap.get(mk) || null;
-    }
-    return null;
-  };
+    return stat;
+  });
 
-  // ③ 聚合
+  // ③ 聚合（匹配统一走 matchSessionKeyToMember，聚合与表格标签共用同一真相源）
   let total = 0;
   for (const obj of bySession.values()) {
     const est = Number(obj.estTotal) || 0;
     total += est;
     result.sessionCount++;
-    const target = matchMember(obj.sessionKey || '');
-    if (target) {
+    const idx = matchSessionKeyToMember(obj.sessionKey || '', members);
+    if (idx >= 0) {
+      const target = stats[idx];
       target.sessionCount++;
       target.estTotal += est;
       target.estInputTotal += Number(obj.estInputTotal) || 0;
@@ -164,7 +177,7 @@ export function readBreakdown(filePath: string, members: BreakdownMember[]): Tok
     }
   }
 
-  result.byMember = [...memberMap.values()];
+  result.byMember = stats;
   result.total = total;
   return result;
 }
@@ -172,7 +185,7 @@ export function readBreakdown(filePath: string, members: BreakdownMember[]): Tok
 /**
  * 读取 jsonl，按 sessionId 去重（保留 estTotal 最大的代表记录），
  * 返回按 ts 倒序排列的单条会话明细列表（最新在前）。不按成员聚合。
- * sessionKey 形如 agent:<agentName>:<context>:<uuid>[:heartbeat]，
+ * sessionKey 形如 agent:<agent_id>:<context>:<uuid>[:heartbeat]（第 2 段为 agent_id，非显示名），
  * 友好名解析交由调用方（handler）借助 config.members 完成，这里只取原始记录。
  */
 export function readSessionList(filePath: string): SessionTokenRow[] {

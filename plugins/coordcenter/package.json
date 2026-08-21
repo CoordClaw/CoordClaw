@@ -1,6 +1,6 @@
 {
   "name": "@coordclaw/coordinationcenter",
-  "version": "19.74.0",
+  "version": "19.81.0",
   "type": "module",
   "engines": {
     "node": ">=22"

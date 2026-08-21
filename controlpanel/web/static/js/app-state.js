@@ -229,6 +229,8 @@ function appState() {
     sseStatus: 'disconnected',
     gatewayStatus: 'disconnected',
     version: '',
+    dbPath: '',
+    openclawUserDir: '',
 
     // 滚动状态（Phase 4）
     isScrolledUp: false,
