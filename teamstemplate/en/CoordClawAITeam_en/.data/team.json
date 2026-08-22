@@ -21,6 +21,7 @@
     "enabled": true,
     "endcode": [
       402,
+      40202,
       429
     ],
     "fields": ["errorMessage", "errorCode"]

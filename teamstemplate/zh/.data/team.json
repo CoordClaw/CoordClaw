@@ -20,7 +20,7 @@
   "note": "项目描述信息",
   "llm_error": {
     "enabled": true,
-    "endcode": [402,429],
+    "endcode": [402,40202,429],
     "fields": ["errorMessage", "errorCode"]
   },
   "checkmessagesrepeatedly":

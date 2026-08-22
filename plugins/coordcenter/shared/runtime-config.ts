@@ -86,18 +86,19 @@ export function extractErrorCode(msg: any, fields: string[]): number | null {
 }
 
 /**
- * 从 messages 末尾往前扫，取最近一条带错误码的消息（与旧语义一致：最近一条决定，非 OR）。
- * 抽到码后由 endcodes 名单做最终过滤：命中返回 true。
+ * 取 run 终态（messages 最后一条消息）的错误码与可读文案。
+ * 只看最后一条消息：run 如何结束由终端消息决定，历史中途错码（已恢复）不计入，避免误熔断。
+ * 返回 null 表示终态无错码（成功 / abort / 正常完成）；否则返回 { code, message }。
  */
-export function scanMessagesForLlmError(messages: any, fields: string[], endcodes: number[]): boolean {
-  if (!Array.isArray(messages) || !Array.isArray(endcodes)) return false;
-  for (let i = messages.length - 1; i >= 0; i--) {
-    const code = extractErrorCode(messages[i], fields);
-    if (code != null) {
-      return endcodes.includes(code);
-    }
-  }
-  return false;
+export function getTerminalLlmError(messages: any, fields: string[]): { code: number; message: string } | null {
+  if (!Array.isArray(messages) || messages.length === 0) return null;
+  const last = messages[messages.length - 1];
+  const code = extractErrorCode(last, fields);
+  if (code == null) return null;
+  const msgFromField = getByPath(last, "errorMessage");
+  const msgFromBody = getByPath(last, "errorBody.message");
+  const message = (typeof msgFromField === "string" && msgFromField.trim()) || (typeof msgFromBody === "string" && msgFromBody.trim()) || "";
+  return { code, message };
 }
 
 export const llmErrorConfig: { enabled: boolean; endcodes: number[]; fields: string[] } = {
